@@ -38,7 +38,7 @@ The guide separates the credential-free local demo, optional integrations, and a
 ### Requirements
 
 - Node.js 20.9 or newer. Node.js 24 is the verified runtime.
-- npm
+- npm 11 or newer (bundled with Node.js 24). `npm ci` rejects the lock file under npm 10; on older Node run `npm install -g npm@11` first.
 - Git
 
 ### 1. Clone and enter the repository

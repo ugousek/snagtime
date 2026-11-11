@@ -10,6 +10,10 @@
   "bugs": "https://github.com/nateherkai/snagtime/issues",
   "homepage": "https://github.com/nateherkai/snagtime#readme",
   "type": "module",
+  "engines": {
+    "node": ">=20.9",
+    "npm": ">=11"
+  },
   "workspaces": [
     "apps/*"
   ],
@@ -59,7 +63,7 @@
     "stripe:sandbox:import": "pwsh -NoProfile -File scripts/import-stripe-sandbox-profile.ps1",
     "dev:stripe-sandbox": "dotenv -o -e .env.local -e .env.stripe-sandbox.local -- npm run dev",
     "demo:free": "npm ci && npm run demo:check -- --free && dotenv -e .env.local -- npm run db:generate && dotenv -e .env.local -- npm run db:migrate && dotenv -e .env.local -- npm run db:seed && dotenv -e .env.local -- npm run dev",
-    "db:generate": "cross-env DATABASE_URL=file:./dev.db prisma generate",
+    "db:generate": "cross-env DATABASE_URL=file:./dev.db prisma generate && npm run db:generate:postgres",
     "db:generate:postgres": "node scripts/generate-postgres-schema.mjs && prisma generate --schema prisma/postgresql/schema.prisma",
     "db:baseline:postgres": "node scripts/generate-postgres-schema.mjs && node scripts/generate-postgres-migration.mjs",
     "db:migrate:postgres": "node scripts/production-config.mjs migration && prisma migrate deploy --schema prisma/postgresql/schema.prisma",
