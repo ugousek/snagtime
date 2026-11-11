@@ -5,7 +5,7 @@ import { Icon, type IconName } from "./icons";
 
 export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="brand-lockup" aria-label="SnagTime">
+    <div className="brand-lockup" aria-label="Rezervace">
       <span className="brand-mark" aria-hidden="true">
         <svg viewBox="0 0 32 32" role="presentation">
           <rect x="5" y="6" width="22" height="20" rx="5" fill="currentColor" />
@@ -15,14 +15,14 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
           <path d="m18.5 18.5 6.5 2.7-2.6 1.1 1.8 3.2-1.9 1.1-1.8-3.2-2 2.1v-7Z" fill="#0B1F3A" stroke="white" strokeWidth=".8" strokeLinejoin="round" />
         </svg>
       </span>
-      {!compact && <span className="brand-name">SnagTime</span>}
+      {!compact && <span className="brand-name">Rezervace</span>}
     </div>
   );
 }
 
 export function Avatar({ name, imageUrl = null, size = "md" }: { name: string; imageUrl?: string | null; size?: "sm" | "md" | "lg" }) {
   const initials = name.split(" ").map((part) => part[0]).slice(0, 2).join("");
-  return imageUrl ? <span className={`avatar avatar-${size}`}><img src={imageUrl} alt={`${name} profile`} /></span> : <span className={`avatar avatar-${size}`} aria-label={name}>{initials}</span>;
+  return imageUrl ? <span className={`avatar avatar-${size}`}><img src={imageUrl} alt={`${name} – profil`} /></span> : <span className={`avatar avatar-${size}`} aria-label={name}>{initials}</span>;
 }
 
 export function Badge({ children, tone = "neutral", dot = false }: { children: ReactNode; tone?: "neutral" | "success" | "warning" | "danger" | "brand" | "info"; dot?: boolean }) {

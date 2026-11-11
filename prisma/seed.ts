@@ -21,12 +21,12 @@ async function main() {
   const host = await prisma.user.upsert({
     where: { email },
     update: { passwordHash, emailVerifiedAt: new Date() },
-    create: { email, name: "Nate Herk", timeZone: "America/Chicago", passwordHash, emailVerifiedAt: new Date() },
+    create: { email, name: "Demo Správce", timeZone: "Europe/Prague", passwordHash, emailVerifiedAt: new Date() },
   });
   const workspace = await prisma.workspace.upsert({
     where: { id: `ws_${host.id}` },
     update: {},
-    create: { id: `ws_${host.id}`, name: "Uppity AI", timeZone: host.timeZone, onboardingCompletedAt: new Date() },
+    create: { id: `ws_${host.id}`, name: "Barbershop Demo", timeZone: host.timeZone, onboardingCompletedAt: new Date() },
   });
   await prisma.membership.upsert({
     where: { workspaceId_userId: { workspaceId: workspace.id, userId: host.id } },
@@ -41,7 +41,7 @@ async function main() {
       workspaceId: workspace.id, userId: host.id,
       timeZone: host.timeZone,
       intervals: {
-        create: [1, 2, 3, 4, 5].map((dayOfWeek) => ({ dayOfWeek, startMinute: 9 * 60, endMinute: 17 * 60 })),
+        create: [1, 2, 3, 4, 5].map((dayOfWeek) => ({ dayOfWeek, startMinute: 9 * 60, endMinute: 19 * 60 })),
       },
     },
   });
@@ -51,31 +51,31 @@ async function main() {
     update: {},
     create: {
       workspaceId: workspace.id, ownerId: host.id,
-      name: "Strategy Call",
+      name: "Pánský střih",
       slug: "strategy-call",
-      description: "A focused conversation about your next best move.",
+      description: "Klasický pánský střih včetně mytí a stylingu.",
       durationMinutes: 30,
       color: "#2563EB",
-      locationType: "CUSTOM",
-      locationValue: "Organizer will share meeting details",
+      locationType: "IN_PERSON",
+      locationValue: "Hlavní 1, Praha",
     },
   });
   if (!await prisma.eventDuration.count({ where: { eventTypeId: eventType.id } })) {
     await prisma.eventDuration.createMany({ data: [
-      { eventTypeId: eventType.id, label: "30 minutes", durationMinutes: 30, isDefault: true, priceCents: 0, currency: "usd", position: 0 },
-      { eventTypeId: eventType.id, label: "60 minutes", durationMinutes: 60, isDefault: false, priceCents: 0, currency: "usd", position: 1 },
+      { eventTypeId: eventType.id, label: "30 minut", durationMinutes: 30, isDefault: true, priceCents: 0, currency: "usd", position: 0 },
+      { eventTypeId: eventType.id, label: "60 minut", durationMinutes: 60, isDefault: false, priceCents: 0, currency: "usd", position: 1 },
     ] });
   }
   if (!await prisma.customQuestion.count({ where: { eventTypeId: eventType.id } })) {
-    await prisma.customQuestion.create({ data: { eventTypeId: eventType.id, label: "What would make this call valuable?", kind: "TEXT", required: false, position: 0 } });
+    await prisma.customQuestion.create({ data: { eventTypeId: eventType.id, label: "Máte nějaké přání ke střihu?", kind: "TEXT", required: false, position: 0 } });
   }
 
   const paidSession = await prisma.eventType.upsert({
     where: { slug: "paid-strategy-session" },
     update: {
-      name: "Revenue Strategy Session",
-      description: "A focused working session for solo experts building a more reliable offer and booking flow.",
-      locationType: "GOOGLE_MEET",
+      name: "Střih a úprava vousů",
+      description: "Kompletní péče: střih, úprava vousů a hot towel.",
+      locationType: "IN_PERSON", locationValue: "Hlavní 1, Praha",
       minimumNoticeMinutes: 120,
       bookingWindowDays: 30,
       isActive: true,
@@ -83,32 +83,32 @@ async function main() {
     create: {
       workspaceId: workspace.id,
       ownerId: host.id,
-      name: "Revenue Strategy Session",
+      name: "Střih a úprava vousů",
       slug: "paid-strategy-session",
-      description: "A focused working session for solo experts building a more reliable offer and booking flow.",
+      description: "Kompletní péče: střih, úprava vousů a hot towel.",
       durationMinutes: 60,
       color: "#2563EB",
-      locationType: "GOOGLE_MEET",
+      locationType: "IN_PERSON", locationValue: "Hlavní 1, Praha",
       minimumNoticeMinutes: 120,
       bookingWindowDays: 30,
     },
   });
-  const paidDuration = await prisma.eventDuration.findFirst({ where: { eventTypeId: paidSession.id, label: "60 minutes" } });
+  const paidDuration = await prisma.eventDuration.findFirst({ where: { eventTypeId: paidSession.id, label: "60 minut" } });
   if (paidDuration) {
     await prisma.eventDuration.update({ where: { id: paidDuration.id }, data: { durationMinutes: 60, isDefault: true, priceCents: 14900, currency: "usd", position: 0, isActive: true } });
   } else {
-    await prisma.eventDuration.create({ data: { eventTypeId: paidSession.id, label: "60 minutes", durationMinutes: 60, isDefault: true, priceCents: 14900, currency: "usd", position: 0 } });
+    await prisma.eventDuration.create({ data: { eventTypeId: paidSession.id, label: "60 minut", durationMinutes: 60, isDefault: true, priceCents: 14900, currency: "usd", position: 0 } });
   }
   if (!await prisma.customQuestion.count({ where: { eventTypeId: paidSession.id } })) {
     await prisma.customQuestion.createMany({ data: [
-      { eventTypeId: paidSession.id, label: "What outcome would make this session valuable?", kind: "TEXTAREA", required: true, position: 0 },
-      { eventTypeId: paidSession.id, label: "What do you currently use for booking and payment?", kind: "TEXT", required: false, position: 1 },
+      { eventTypeId: paidSession.id, label: "Popište, jaký střih a úpravu vousů chcete", kind: "TEXTAREA", required: true, position: 0 },
+      { eventTypeId: paidSession.id, label: "Telefon", kind: "TEXT", required: false, position: 1 },
     ] });
   }
   await prisma.workspaceBranding.upsert({
     where: { workspaceId: workspace.id },
     update: {},
-    create: { workspaceId: workspace.id, userId: host.id, workspaceName: "Uppity AI", accentColor: "#2563EB", description: "Book a focused conversation with Nate." },
+    create: { workspaceId: workspace.id, userId: host.id, workspaceName: "Barbershop Demo", accentColor: "#2563EB", description: "Objednejte se online k nám do barbershopu." },
   });
 }
 

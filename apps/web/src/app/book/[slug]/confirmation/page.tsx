@@ -1,5 +1,5 @@
 import { ConfirmationView } from "@/components/booking-outcome";
-export const metadata = { title: "Booking confirmed" };
+export const metadata = { title: "Rezervace potvrzena" };
 export default async function ConfirmationPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   const one = (value: string | string[] | undefined) => typeof value === "string" ? value : undefined;
