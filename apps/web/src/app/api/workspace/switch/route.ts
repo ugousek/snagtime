@@ -3,8 +3,9 @@ import { rotateSessionWorkspace, SESSION_COOKIE, sessionCookieOptions, requireWo
 import { workspaceSwitchInput } from "@/server/validation";
 import { getAccountSummary } from "@/server/services/accounts";
 import { enforceRateLimit } from "@/server/rate-limit";
+import { withDatabaseScope } from "@/server/db-context";
 
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   try {
     const input = workspaceSwitchInput.parse(await jsonBody(request)); const current = await requireWorkspaceAccess(request); await enforceRateLimit(`workspace-switch:user:${current.user.id}`, 30, 60_000);
     const token = await rotateSessionWorkspace(request, input.workspaceId);
@@ -12,3 +13,5 @@ export async function POST(request: Request) {
     const response = ok(await getAccountSummary({ sessionId: "rotated", user: current.user, workspaceId: membership.workspaceId, workspace: membership.workspace, membership, role: membership.role as typeof current.role })); response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions); return response;
   } catch (error) { return apiError(error); }
 }
+
+export const POST = withDatabaseScope(POSTHandler);

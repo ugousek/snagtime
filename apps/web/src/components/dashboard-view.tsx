@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Booking, EventType } from "./demo-data";
 import { frontendApi } from "./api-adapter";
 import { Icon } from "./icons";
-import { Avatar, Badge, ButtonLink, EmptyState, Metric, PageHeader, SectionHeader } from "./ui";
+import { Avatar, Badge, ButtonLink, EmptyState, Metric, PageHeader, SectionHeader, bookingStatusLabel } from "./ui";
 import { useWorkspaceAccess } from "./workspace-access";
 
 function calendarMonthKey(value: Date, timeZone: string) {
@@ -50,7 +50,7 @@ export function DashboardView() {
             {upcoming.map((booking) => (
               <Link href={`/bookings?selected=${booking.id}`} className="booking-row" key={booking.id}>
                 <div className="date-chip"><strong>{new Intl.DateTimeFormat("cs-CZ", { day: "numeric", timeZone: workspaceTimeZone }).format(new Date(booking.startsAt))}</strong><span>{new Intl.DateTimeFormat("cs-CZ", { month: "short", timeZone: workspaceTimeZone }).format(new Date(booking.startsAt))}</span></div>
-                <div className="booking-main"><div><strong>{booking.invitee}</strong><Badge tone={booking.status === "pending" ? "warning" : "success"} dot>{booking.status}</Badge></div><span>{booking.eventTitle}</span><small><Icon name="clock" size={14} />{booking.timeLabel}<i>·</i><Icon name="team" size={14} />{booking.hostName}</small></div>
+                <div className="booking-main"><div><strong>{booking.invitee}</strong><Badge tone={booking.status === "pending" ? "warning" : "success"} dot>{bookingStatusLabel(booking.status)}</Badge></div><span>{booking.eventTitle}</span><small><Icon name="clock" size={14} />{booking.timeLabel}<i>·</i><Icon name="team" size={14} />{booking.hostName}</small></div>
                 <Avatar name={booking.invitee} size="sm" />
                 <Icon name="arrow-right" size={16} />
               </Link>

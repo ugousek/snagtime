@@ -3,9 +3,10 @@ import { acknowledgeBookingManageSession, exchangeBookingCapabilities, manageCoo
 import { apiError, jsonBody, ok } from "@/server/http";
 import { clientAddress, enforceRateLimit } from "@/server/rate-limit";
 import { bookingCapabilityExchangeInput } from "@/server/validation";
+import { withDatabaseScope } from "@/server/db-context";
 
 type Context = { params: Promise<{ id: string }> };
-export async function POST(request: Request, context: Context) {
+async function POSTHandler(request: Request, context: Context) {
   try {
     assertSameOrigin(request); await enforceRateLimit(`manage-exchange:${clientAddress(request)}`, 12, 15 * 60_000);
     const { id } = await context.params; const bundle = bookingCapabilityExchangeInput.parse(await jsonBody(request));
@@ -17,10 +18,13 @@ export async function POST(request: Request, context: Context) {
   } catch (error) { return apiError(error); }
 }
 
-export async function PATCH(request: Request, context: Context) {
+async function PATCHHandler(request: Request, context: Context) {
   try {
     assertSameOrigin(request); const { id } = await context.params;
     await enforceRateLimit(`manage-ack:${clientAddress(request)}`, 30, 15 * 60_000);
     return ok(await acknowledgeBookingManageSession(request, id));
   } catch (error) { return apiError(error); }
 }
+
+export const POST = withDatabaseScope(POSTHandler);
+export const PATCH = withDatabaseScope(PATCHHandler);

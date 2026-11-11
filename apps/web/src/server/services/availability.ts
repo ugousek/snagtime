@@ -137,7 +137,9 @@ export async function setAvailability(workspaceId: string, userId: string, input
       workspaceId, userId, dateKey: item.dateKey, isAvailable: item.isAvailable,
       startMinute: item.isAvailable ? item.startMinute : null, endMinute: item.isAvailable ? item.endMinute : null,
     })) });
-    await tx.user.update({ where: { id: userId }, data: { timeZone: input.timeZone } });
+    // Best-effort profile sync: in production RLS lets the app role update "User" only under
+    // the account_write action, so a strict update() would abort the whole availability save.
+    await tx.user.updateMany({ where: { id: userId, NOT: { timeZone: input.timeZone } }, data: { timeZone: input.timeZone } });
   });
   return getAvailability(workspaceId, userId);
 }

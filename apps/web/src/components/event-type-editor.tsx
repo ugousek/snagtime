@@ -10,9 +10,12 @@ import { Icon } from "./icons";
 import { ActionButton, Badge, Field, Toggle } from "./ui";
 import { useWorkspaceAccess } from "./workspace-access";
 
+/** URL slug from a Czech title: "Pánský střih" -> "pansky-strih". */
+function slugify(value: string) { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60); }
+
 const defaultEvent: EventType = {
-  id: "new", title: "", slug: "", description: "", color: "#2563eb", status: "draft", location: "Google Meet",
-  locationType: "GOOGLE_MEET", locationValue: null,
+  id: "new", title: "", slug: "", description: "", color: "#2563eb", status: "draft", location: "Osobně",
+  locationType: "IN_PERSON", locationValue: null,
   durations: [{ minutes: 30, label: "30 min", isDefault: true, currency: "USD" }], questions: [],
   bookingWindowDays: 60, bufferBeforeMinutes: 15, bufferAfterMinutes: 15, minimumNoticeMinutes: 240,
   bookingCount: 0, hostName: "",
@@ -93,7 +96,7 @@ export function EventTypeEditor({ eventId, mode = "edit" }: { eventId?: string; 
   return <div className="editor-page">
     <header className="editor-topbar">
       <div className="editor-title"><Link href="/event-types" className="icon-button" aria-label="Zpět na služby"><Icon name="arrow-left" /></Link><div><span>{mode === "create" ? "Nová služba" : "Úprava služby"}</span><strong>{event.title || "Služba bez názvu"}</strong></div><Badge tone={event.status === "published" ? "success" : "neutral"} dot>{event.status}</Badge></div>
-      <div className="editor-actions">{mode === "edit" && <ActionButton onClick={() => void remove()} variant="danger" disabled={deleting || saving}>{deleting ? "Deleting…" : "Smazat"}</ActionButton>}{persistedSlug ? <Link href={`/book/${persistedSlug}`} className="button button-secondary"><Icon name="external" size={16} />Náhled zveřejněné stránky</Link> : <button type="button" className="button button-secondary" disabled title="Před náhledem službu uložte a zveřejněte"><Icon name="external" size={16} />Náhled není dostupný</button>}{event.status !== "published" && <ActionButton onClick={() => save(false)} variant="secondary" disabled={saving || deleting}>{saving ? "Saving…" : "Uložit koncept"}</ActionButton>}<ActionButton onClick={() => save(true)} variant="primary" disabled={!canPublish || saving || deleting}>{saving ? "Saving…" : event.status === "published" ? "Uložit změny" : "Zveřejnit službu"}</ActionButton></div>
+      <div className="editor-actions">{mode === "edit" && <ActionButton onClick={() => void remove()} variant="danger" disabled={deleting || saving}>{deleting ? "Mažu…" : "Smazat"}</ActionButton>}{persistedSlug ? <Link href={`/book/${persistedSlug}`} className="button button-secondary"><Icon name="external" size={16} />Náhled zveřejněné stránky</Link> : <button type="button" className="button button-secondary" disabled title="Před náhledem službu uložte a zveřejněte"><Icon name="external" size={16} />Náhled není dostupný</button>}{event.status !== "published" && <ActionButton onClick={() => save(false)} variant="secondary" disabled={saving || deleting}>{saving ? "Ukládám…" : "Uložit koncept"}</ActionButton>}<ActionButton onClick={() => save(true)} variant="primary" disabled={!canPublish || saving || deleting}>{saving ? "Ukládám…" : event.status === "published" ? "Uložit změny" : "Zveřejnit službu"}</ActionButton></div>
     </header>
     {saved && <div className="toast" role="status"><span><Icon name="check" /></span>Změny uloženy</div>}
     {saveError && <div className="toast toast-error" role="alert"><span><Icon name="x" /></span>{saveError}</div>}
@@ -104,8 +107,8 @@ export function EventTypeEditor({ eventId, mode = "edit" }: { eventId?: string; 
         <div id="event-settings-panel" role="tabpanel" aria-labelledby={`event-tab-${activeTab.toLowerCase()}`}>
         {activeTab === "Základní údaje" && <div className="editor-sections">
           <section className="form-card"><div className="form-card-title"><span className="number-chip">1</span><div><h2>Údaje o službě</h2><p>Dejte klientům jasný důvod k rezervaci.</p></div></div><div className="form-grid">
-            <Field label="Název služby" required><input value={event.title} onChange={(e) => update("title", e.target.value)} placeholder="např. Pánský střih" /></Field>
-            <Field label="Rezervační odkaz" required hint={publicUrl}><div className="input-prefix"><span suppressHydrationWarning>{typeof window === "undefined" ? "/book/" : `${window.location.origin}/book/`}</span><input value={event.slug} onChange={(e) => update("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} placeholder="discovery-call" /></div></Field>
+            <Field label="Název služby" required><input value={event.title} onChange={(e) => { const title = e.target.value; const autoSlug = !event.slug || event.slug === slugify(event.title); update("title", title); if (autoSlug) update("slug", slugify(title)); }} placeholder="např. Pánský střih" /></Field>
+            <Field label="Rezervační odkaz" required hint={publicUrl}><div className="input-prefix"><span suppressHydrationWarning>{typeof window === "undefined" ? "/book/" : `${window.location.origin}/book/`}</span><input value={event.slug} onChange={(e) => update("slug", e.target.value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9-]/g, "-"))} placeholder="pansky-strih" /></div></Field>
             <Field label="Popis"><textarea rows={4} value={event.description} onChange={(e) => update("description", e.target.value)} placeholder="Popište klientům, o co jde a jak se připravit." /></Field>
             <Field label="Barva služby"><div className="color-options" role="radiogroup" aria-label="Barva služby">{["#2563eb", "#16a394", "#3978d4", "#ed7a5f", "#e2a93b", "#8f5db7"].map((color) => <button type="button" role="radio" aria-checked={event.color === color} key={color} className={event.color === color ? "is-selected" : ""} style={{ background: color, color: foregroundForBackground(color) }} onClick={() => update("color", color)} aria-label={`Použít barvu ${color}`}><Icon name="check" size={14} /></button>)}</div></Field>
           </div></section>

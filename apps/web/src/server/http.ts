@@ -19,7 +19,10 @@ export function apiError(error: unknown) {
       { status: error.status },
     );
   }
-  console.error("Unhandled API error", { type: error instanceof Error ? error.name : "unknown" });
+  // Log the error class plus Prisma's machine code and model (never messages or values) so operators can diagnose 500s.
+  const prismaCode = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : undefined;
+  const prismaModel = error && typeof error === "object" && "meta" in error && error.meta && typeof error.meta === "object" && "modelName" in error.meta && typeof error.meta.modelName === "string" ? error.meta.modelName : undefined;
+  console.error("Unhandled API error", { type: error instanceof Error ? error.name : "unknown", code: prismaCode, model: prismaModel });
   return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong." } }, { status: 500 });
 }
 

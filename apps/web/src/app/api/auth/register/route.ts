@@ -3,8 +3,9 @@ import { assertSameOrigin } from "@/server/auth/session";
 import { registrationInput } from "@/server/validation";
 import { clientAddress, enforceRateLimit } from "@/server/rate-limit";
 import { registerAccount } from "@/server/services/accounts";
+import { withDatabaseScope } from "@/server/db-context";
 
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   try {
     assertSameOrigin(request); const input = registrationInput.parse(await jsonBody(request));
     await enforceRateLimit(`register:ip:${clientAddress(request)}`, 5, 60 * 60_000); await enforceRateLimit(`register:account:${input.email}`, 3, 60 * 60_000);
@@ -12,3 +13,5 @@ export async function POST(request: Request) {
     return ok({ accepted: true as const, verificationPending: true as const }, { status: 202 });
   } catch (error) { return apiError(error); }
 }
+
+export const POST = withDatabaseScope(POSTHandler);

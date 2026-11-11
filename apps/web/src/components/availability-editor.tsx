@@ -25,6 +25,7 @@ export function AvailabilityEditor() {
   const [dirty, setDirty] = useState(false);
   const [loadState, setLoadState] = useState<AvailabilityLoadState>("loading");
   const [error, setError] = useState("");
+  const [suggested, setSuggested] = useState(false);
   const editRevision = useRef(0);
   const loadRevision = useRef(0);
 
@@ -37,8 +38,12 @@ export function AvailabilityEditor() {
     const requestRevision = ++loadRevision.current;
     return frontendApi.getAvailability().then((schedule) => {
       if (loadRevision.current !== requestRevision) return;
-      setDays(schedule.days); setTimeZone(schedule.timeZone); setOverrides(schedule.overrides);
-      editRevision.current = 0; setDirty(false); setLoadState("loaded");
+      // A fresh workspace has no working hours, so nothing is bookable. Pre-fill a
+      // typical Mon–Fri 9–17 week and let the owner confirm it with one save.
+      const empty = schedule.days.every((day) => !day.enabled);
+      const days = empty ? schedule.days.map((day, index) => index < 5 ? { ...day, enabled: true, windows: [{ id: crypto.randomUUID(), start: "9:00", end: "17:00" }] } : day) : schedule.days;
+      setDays(days); setTimeZone(schedule.timeZone); setOverrides(schedule.overrides);
+      editRevision.current = empty ? 1 : 0; setDirty(empty); setSuggested(empty); setLoadState("loaded");
     }).catch((reason) => {
       if (loadRevision.current !== requestRevision) return;
       setError(reason instanceof Error ? reason.message : "Dostupnost se nepodařilo načíst."); setLoadState("error");
@@ -54,7 +59,7 @@ export function AvailabilityEditor() {
     try {
       const schedule = await frontendApi.saveAvailability(submittedDays, submittedTimeZone, submittedOverrides);
       if (availabilitySaveResultIsCurrent(submittedRevision, editRevision.current)) {
-        setDays(schedule.days); setTimeZone(schedule.timeZone); setOverrides(schedule.overrides); setDirty(false); setSaved(true);
+        setDays(schedule.days); setTimeZone(schedule.timeZone); setOverrides(schedule.overrides); setDirty(false); setSuggested(false); setSaved(true);
         window.setTimeout(() => setSaved(false), 2400);
       }
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Dostupnost se nepodařilo uložit."); }
@@ -76,7 +81,8 @@ export function AvailabilityEditor() {
   if (loadState === "error") return <div className="page-stack"><PageHeader eyebrow="Rozvrh · Pracovní doba" title="Dostupnost" description="Nastavte, kdy si vás klienti mohou rezervovat. Pravidla služeb a kolize v kalendáři se uplatní navíc." /><section className="panel error-state" role="alert"><span><Icon name="x" /></span><h2>Dostupnost se nenačetla</h2><p>{error || "Dostupnost se nepodařilo načíst."}</p><ActionButton variant="primary" onClick={retryLoad}>Zkusit znovu</ActionButton></section></div>;
 
   return <div className="page-stack">
-    <PageHeader eyebrow="Rozvrh · Pracovní doba" title="Dostupnost" description="Nastavte, kdy si vás klienti mohou rezervovat. Pravidla služeb a kolize v kalendáři se uplatní navíc." actions={<ActionButton variant="primary" onClick={save} disabled={saving || !dirty || conflictingDates.size > 0}><Icon name="check" size={16} />{saving ? "Saving…" : dirty ? "Uložit změny" : "Uloženo"}</ActionButton>} />
+    <PageHeader eyebrow="Rozvrh · Pracovní doba" title="Dostupnost" description="Nastavte, kdy si vás klienti mohou rezervovat. Pravidla služeb a kolize v kalendáři se uplatní navíc." actions={<ActionButton variant="primary" onClick={save} disabled={saving || !dirty || conflictingDates.size > 0}><Icon name="check" size={16} />{saving ? "Ukládám…" : dirty ? "Uložit změny" : "Uloženo"}</ActionButton>} />
+    {suggested && <div className="sync-note" role="status"><Icon name="clock" size={16} />Zatím nemáte nastavenou pracovní dobu, takže si klienti nemohou nic rezervovat. Předvyplnili jsme Po–Pá 9:00–17:00. Upravte ji a klikněte na „Uložit změny“.</div>}
     {saved && <div className="toast" role="status"><span><Icon name="check" /></span>Dostupnost uložena</div>}
     {error && <div className="toast toast-error" role="alert"><span><Icon name="x" /></span>{error}</div>}
     {conflictingDates.size > 0 && <div className="toast toast-error" role="alert"><span><Icon name="x" /></span>Každé datum použijte jen jednou. Před uložením odeberte nebo změňte zvýrazněné duplicitní datum.</div>}
@@ -93,7 +99,7 @@ export function AvailabilityEditor() {
       </section>
       <aside className="availability-aside">
         <section className="panel compact-panel"><SectionHeader title="Náhled kalendáře" /><div className="mini-week"><div className="mini-week-head">{days.map((day) => <span key={day.short}>{day.short[0]}</span>)}</div><div className="mini-week-grid">{days.map((day) => <div key={day.short} className={day.enabled ? "has-hours" : ""}>{day.enabled && <span style={{ height: `${Math.max(28, day.windows.length * 24)}px` }} />}</div>)}</div></div><p className="aside-note"><span className="legend-dot" />Vaše rezervovatelné hodiny před uplatněním pravidel služeb a kolizí v kalendáři.</p></section>
-        <section className="panel compact-panel"><SectionHeader title="Pravidla rozvrhu" /><Field label="Časové pásmo"><select value={timeZone} onChange={(event) => patchTimeZone(event.target.value)}>{[...new Set([timeZone, "America/Chicago", "America/New_York", "America/Los_Angeles", "Europe/London", "UTC"])].map((zone) => <option value={zone} key={zone}>{zone}</option>)}</select></Field><p className="aside-note">Klienti si na veřejné rezervační stránce volí vlastní časové pásmo.</p></section>
+        <section className="panel compact-panel"><SectionHeader title="Pravidla rozvrhu" /><Field label="Časové pásmo"><select value={timeZone} onChange={(event) => patchTimeZone(event.target.value)}>{[...new Set([timeZone, "Europe/Prague", "Europe/Bratislava", "America/Chicago", "America/New_York", "America/Los_Angeles", "Europe/London", "UTC"])].map((zone) => <option value={zone} key={zone}>{zone}</option>)}</select></Field><p className="aside-note">Klienti si na veřejné rezervační stránce volí vlastní časové pásmo.</p></section>
       </aside>
     </div>
     <div className="two-panel-grid">

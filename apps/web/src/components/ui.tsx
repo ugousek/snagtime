@@ -25,6 +25,8 @@ export function Avatar({ name, imageUrl = null, size = "md" }: { name: string; i
   return imageUrl ? <span className={`avatar avatar-${size}`}><img src={imageUrl} alt={`${name} – profil`} /></span> : <span className={`avatar avatar-${size}`} aria-label={name}>{initials}</span>;
 }
 
+export const bookingStatusLabel = (status: string) => ({ confirmed: "Potvrzeno", pending: "Čeká na platbu", canceled: "Zrušeno" } as Record<string, string>)[status] ?? status;
+
 export function Badge({ children, tone = "neutral", dot = false }: { children: ReactNode; tone?: "neutral" | "success" | "warning" | "danger" | "brand" | "info"; dot?: boolean }) {
   return <span className={`badge badge-${tone}`}>{dot && <span className="badge-dot" />}{children}</span>;
 }

@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { assertProductionRuntimeSecurity } from "@/server/auth/session";
 import { healthQuery } from "@/server/health-db";
 import { assertCompiledBuildIdentity } from "@/server/build-identity";
+import { withDatabaseScope } from "@/server/db-context";
 export const dynamic = "force-dynamic";
 const timeout = <T,>(promise: Promise<T>, ms = 2_000) => Promise.race([promise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
-export async function GET() {
+async function GETHandler() {
   try {
     if(process.env.NODE_ENV!=="production")return NextResponse.json({status:"ready"},{headers:{"Cache-Control":"no-store"}});
     if (process.env.NODE_ENV === "production") {
@@ -19,3 +20,5 @@ export async function GET() {
     return NextResponse.json({ status: "ready" }, { headers: { "Cache-Control": "no-store" } });
   } catch { return NextResponse.json({ status: "unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } }); }
 }
+
+export const GET = withDatabaseScope(GETHandler);

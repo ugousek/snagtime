@@ -44,10 +44,10 @@ export function EventTypesView() {
     <div className="event-card-grid">
       {filtered.map((event) => <article className="event-card" key={event.id}>
         <div className="event-card-accent" style={{ background: event.color }} />
-        <div className="event-card-head"><Badge tone={event.status === "published" ? "success" : "neutral"} dot>{event.status}</Badge></div>
+        <div className="event-card-head"><Badge tone={event.status === "published" ? "success" : "neutral"} dot>{event.status === "published" ? "Zveřejněno" : "Koncept"}</Badge></div>
         <div className="event-card-body"><h2>{event.title}</h2><p>{event.description}</p><div className="event-meta"><span><Icon name="clock" />{event.durations.map((item) => item.label).join(", ")}</span><span><Icon name="video" />{event.location}</span><span><Icon name="team" />{event.hostName}</span><span><Icon name="bookings" />{event.bookingCount} {event.bookingCount === 1 ? "booking" : "bookings"}</span></div></div>
         <div className="event-card-link"><span suppressHydrationWarning>{typeof window === "undefined" ? `/book/${event.slug}` : `${window.location.origin}/book/${event.slug}`}</span><button type="button" onClick={() => copyLink(event)} aria-label={`Zkopírovat rezervační odkaz pro ${event.title}`}>{copiedId === event.id ? <Icon name="check" /> : <Icon name="copy" />}</button><Link href={`/book/${event.slug}`} aria-label="Otevřít rezervační stránku"><Icon name="external" /></Link></div>
-        <div className="event-card-foot"><Toggle checked={event.status === "published"} onChange={() => void toggle(event.id)} label={`${event.status === "published" ? "Unpublish" : "Publish"} ${event.title}`} disabled={savingId === event.id} /><span>{savingId === event.id ? "Saving…" : event.status === "published" ? "Přijímá rezervace" : "Neveřejné"}</span><Link className="button button-secondary button-sm" href={`/event-types/${event.id}`}>Upravit</Link></div>
+        <div className="event-card-foot"><Toggle checked={event.status === "published"} onChange={() => void toggle(event.id)} label={`${event.status === "published" ? "Unpublish" : "Publish"} ${event.title}`} disabled={savingId === event.id} /><span>{savingId === event.id ? "Ukládám…" : event.status === "published" ? "Přijímá rezervace" : "Neveřejné"}</span><Link className="button button-secondary button-sm" href={`/event-types/${event.id}`}>Upravit</Link></div>
       </article>)}
     </div>
   </div>;

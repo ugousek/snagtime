@@ -3,9 +3,10 @@ import { assertSameOrigin } from "@/server/auth/session";
 import { apiError, ok } from "@/server/http";
 import { enforceRateLimit } from "@/server/rate-limit";
 import { resumeBookingCheckout } from "@/server/services/bookings";
+import { withDatabaseScope } from "@/server/db-context";
 
 type Context = { params: Promise<{ id: string }> };
-export async function POST(request: Request, context: Context) {
+async function POSTHandler(request: Request, context: Context) {
   try {
     assertSameOrigin(request);
     const { id } = await context.params;
@@ -16,3 +17,5 @@ export async function POST(request: Request, context: Context) {
     return response;
   } catch (error) { return apiError(error); }
 }
+
+export const POST = withDatabaseScope(POSTHandler);
