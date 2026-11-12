@@ -58,3 +58,19 @@ BEGIN
 END $fn$;
 REVOKE ALL ON FUNCTION tempocove_workspace_month_bookings(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION tempocove_workspace_month_bookings(text) TO tempocove_app;
+
+-- Busy intervals (times only, buffers applied, no client data) of one host, for slot generation.
+-- The public booking context may not read other clients' bookings, so without this the public
+-- page offered times that were already taken and the booking then failed with a conflict.
+CREATE OR REPLACE FUNCTION tempocove_host_busy(p_workspace text, p_host text, p_from timestamp, p_to timestamp, p_exclude text)
+RETURNS TABLE(busy_start timestamp, busy_end timestamp)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog,public AS $fn$
+BEGIN
+  IF p_workspace IS NULL OR p_workspace IS DISTINCT FROM current_setting('tempocove.workspace_id', true) THEN RETURN; END IF;
+  RETURN QUERY SELECT b."startAt" - make_interval(mins => b."bufferBeforeMinutes"), b."endAt" + make_interval(mins => b."bufferAfterMinutes")
+    FROM "Booking" b
+    WHERE b."workspaceId"=p_workspace AND b."hostId"=p_host AND b.status IN ('CONFIRMED','PENDING_PAYMENT')
+      AND b."startAt" < p_to AND b."endAt" > p_from AND (p_exclude IS NULL OR b.id<>p_exclude);
+END $fn$;
+REVOKE ALL ON FUNCTION tempocove_host_busy(text,text,timestamp,timestamp,text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION tempocove_host_busy(text,text,timestamp,timestamp,text) TO tempocove_app;

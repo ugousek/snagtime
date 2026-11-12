@@ -23,7 +23,7 @@ export function PlanPanel() {
     <div className="plan-usage">
       <div><small>Online rezervace tento měsíc</small><strong>{summary.usage.monthlyBookings}{limit != null ? ` z ${limit}` : ""}</strong>{limit != null && <span className="plan-meter"><span style={{ width: `${Math.min(100, Math.round(summary.usage.monthlyBookings / limit * 100))}%` }} /></span>}</div>
       <div><small>Členové týmu</small><strong>{summary.usage.members} z {current.members}</strong></div>
-      <div><small>Platí do</small><strong>{summary.validUntil && summary.plan !== "FREE" ? new Date(summary.validUntil).toLocaleDateString("cs-CZ") : "bez omezení"}</strong></div>
+      <div><small>Platí do</small><strong>{summary.validUntil && summary.plan !== "FREE" ? new Date(summary.validUntil).toLocaleDateString("cs-CZ", { timeZone: "UTC" }) : "bez omezení"}</strong></div>
     </div>
     <div className="plan-grid">{summary.plans.map((plan) => <div key={plan.id} className={plan.id === summary.plan ? "plan-card is-current" : "plan-card"}>
       <strong>{plan.name}</strong><span className="plan-price">{czk(plan.priceCzk)}<small> / měsíc</small></span>
