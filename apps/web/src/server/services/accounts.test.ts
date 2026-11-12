@@ -156,8 +156,8 @@ describe("production workspace accounts", () => {
     const created = await account("login-enumeration", false);
     const call = (email: string) => loginRoute(new Request("http://localhost:3000/api/auth/session", { method: "POST", headers: { origin: "http://localhost:3000", "content-type": "application/json" }, body: JSON.stringify({ email, password: "Definitely!Wrong9" }) }));
     const known = await call(created.user.email); const unknown = await call(`absent-${crypto.randomUUID()}@example.com`);
-    expect({ status: known.status, body: await known.json() }).toEqual({ status: 401, body: { error: { code: "AUTHENTICATION_FAILED", message: "Email or password is invalid." } } });
-    expect({ status: unknown.status, body: await unknown.json() }).toEqual({ status: 401, body: { error: { code: "AUTHENTICATION_FAILED", message: "Email or password is invalid." } } });
+    expect({ status: known.status, body: await known.json() }).toEqual({ status: 401, body: { error: { code: "AUTHENTICATION_FAILED", message: "E-mail nebo heslo není správné." } } });
+    expect({ status: unknown.status, body: await unknown.json() }).toEqual({ status: 401, body: { error: { code: "AUTHENTICATION_FAILED", message: "E-mail nebo heslo není správné." } } });
   });
 
   it("changes the password with a predecessor CAS, revokes every old session, and rotates fixation state", async () => {

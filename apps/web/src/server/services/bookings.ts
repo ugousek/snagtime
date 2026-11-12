@@ -1,3 +1,4 @@
+import { assertBookingQuota } from "@/server/services/plans";
 import { createHash } from "node:crypto";
 import { DateTime } from "luxon";
 import type { BookingManageCapabilities, CreateBookingInput, CreateBookingResult, ResumeBookingCheckoutResult } from "@/lib/contracts";
@@ -66,24 +67,32 @@ export async function listPublicSlots(slug: string, from: Date, to: Date, output
   const bookingRangeEnd = DateTime.fromJSDate(to).plus({ minutes: effectiveBufferAfter + MAX_VALIDATED_BOOKING_BUFFER_MINUTES }).toJSDate();
   const [schedule, bookings, providerBusy] = await Promise.all([
     getAvailability(eventType.workspaceId, eventType.ownerId, eventType.owner.timeZone, { from, to }),
-    db.booking.findMany({
-      where: { id: excludeBookingId ? { not: excludeBookingId } : undefined, workspaceId: eventType.workspaceId, hostId: eventType.ownerId, status: { in: activeStatuses }, startAt: { lt: bookingRangeEnd }, endAt: { gt: bookingRangeStart } },
-      select: { startAt: true, endAt: true, bufferBeforeMinutes: true, bufferAfterMinutes: true },
-    }),
+    hostBusyIntervals(eventType.workspaceId, eventType.ownerId, bookingRangeStart, bookingRangeEnd, excludeBookingId),
     providerBusyRequest(),
   ]);
   return generateSlots({
     eventType: { ...eventType, bookingWindowDays: bookingWindowDaysOverride ?? eventType.bookingWindowDays, durationId: duration.id, durationMinutes: durationMinutesOverride ?? duration.durationMinutes, bufferBeforeMinutes: effectiveBufferBefore, bufferAfterMinutes: effectiveBufferAfter, priceCents: duration.priceCents, currency: duration.currency },
     schedule,
     busy: [
-      ...bookings.map((item) => ({
-        start: DateTime.fromJSDate(item.startAt).minus({ minutes: item.bufferBeforeMinutes }).toJSDate(),
-        end: DateTime.fromJSDate(item.endAt).plus({ minutes: item.bufferAfterMinutes }).toJSDate(),
-      })),
+      ...bookings,
       ...providerBusy,
     ],
     from, to, outputTimeZone,
   });
+}
+
+/** Times when the host is already booked (buffers included). In PostgreSQL production this goes through
+ * tempocove_host_busy(), because the public booking context cannot read other clients' bookings. */
+async function hostBusyIntervals(workspaceId: string, hostId: string, from: Date, to: Date, excludeBookingId?: string) {
+  if (process.env.DATABASE_PROVIDER === "postgresql" && process.env.NODE_ENV === "production") {
+    const rows = await db.$queryRaw<Array<{ busy_start: Date; busy_end: Date }>>`SELECT busy_start, busy_end FROM tempocove_host_busy(${workspaceId}, ${hostId}, ${from}::timestamp, ${to}::timestamp, ${excludeBookingId ?? null})`;
+    return rows.map((row) => ({ start: row.busy_start, end: row.busy_end }));
+  }
+  const bookings = await db.booking.findMany({
+    where: { id: excludeBookingId ? { not: excludeBookingId } : undefined, workspaceId, hostId, status: { in: activeStatuses }, startAt: { lt: to }, endAt: { gt: from } },
+    select: { startAt: true, endAt: true, bufferBeforeMinutes: true, bufferAfterMinutes: true },
+  });
+  return bookings.map((item) => ({ start: DateTime.fromJSDate(item.startAt).minus({ minutes: item.bufferBeforeMinutes }).toJSDate(), end: DateTime.fromJSDate(item.endAt).plus({ minutes: item.bufferAfterMinutes }).toJSDate() }));
 }
 
 export function occupiedMinutes(start: Date, end: Date, beforeMinutes: number, afterMinutes: number) {
@@ -157,6 +166,7 @@ export async function createBooking(
   let created;
   try {
     created = await withDatabaseTransactionRetry((remainingMs) => db.$transaction(async (tx) => {
+      await assertBookingQuota(tx, eventType.workspaceId);
       const booking = await tx.booking.create({ data: {
         workspaceId: eventType.workspaceId, eventTypeId: eventType.id, hostId: eventType.ownerId, durationId: duration.id,
         durationMinutes: duration.durationMinutes, priceCents: duration.priceCents, currency: duration.currency,

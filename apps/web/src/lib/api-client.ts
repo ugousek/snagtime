@@ -50,6 +50,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body.data;
 }
 
+export type PlanId = "FREE" | "START" | "PROFI";
+export type PlanInfo = { id: PlanId; name: string; priceCzk: number; monthlyBookings: number | null; members: number };
+export type WorkspacePlanSummary = { plan: PlanId; storedPlan: PlanId; validUntil: string | null; usage: { monthlyBookings: number; members: number }; plans: PlanInfo[]; contactEmail: string | null; platformAdmin: boolean };
+export type PlatformWorkspace = { id: string; name: string; createdAt: string; owners: { name: string; email: string }[]; members: number; services: number; monthlyBookings: number; plan: PlanId; storedPlan: PlanId; validUntil: string | null; note: string | null };
+
 export const snagTimeApi = {
   session: () => request<{ user: SessionUser | null; workspace: AccountSummary["workspace"] | null }>("/api/auth/session"),
   login: (email: string, password: string) => request<{ user: SessionUser }>("/api/auth/session", { method: "POST", body: JSON.stringify({ email, password }) }),
@@ -78,6 +83,9 @@ export const snagTimeApi = {
   getAvailability: () => request<AvailabilitySchedule>("/api/availability"),
   setAvailability: (schedule: AvailabilitySchedule) => request<AvailabilitySchedule>("/api/availability", { method: "PUT", body: JSON.stringify(schedule) }),
   listBookings: () => request<BookingSummary[]>("/api/bookings"),
+  getWorkspacePlan: () => request<WorkspacePlanSummary>("/api/workspace/plan"),
+  listPlatformWorkspaces: () => request<PlatformWorkspace[]>("/api/platform/workspaces"),
+  setWorkspacePlan: (workspaceId: string, input: { plan: PlanId; validUntil: string | null; note: string | null }) => request<{ workspaceId: string }>(`/api/platform/workspaces/${encodeURIComponent(workspaceId)}`, { method: "PUT", body: JSON.stringify(input) }),
   getPublicEventType: (slug: string) => request<EventTypeSummary>(`/api/public/${slug}`),
   getSlots: (slug: string, from: string, to: string, timeZone: string, durationId?: string, signal?: AbortSignal) => request<BookingSlot[]>(`/api/public/${slug}/slots?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&timeZone=${encodeURIComponent(timeZone)}${durationId ? `&durationId=${encodeURIComponent(durationId)}` : ""}`, { signal }),
   createBooking: (slug: string, input: CreateBookingInput, idempotencyKey = crypto.randomUUID()) => request<CreateBookingResult>(`/api/public/${slug}/bookings`, { method: "POST", headers: { "idempotency-key": idempotencyKey }, body: JSON.stringify(input) }),

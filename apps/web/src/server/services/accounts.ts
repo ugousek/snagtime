@@ -1,3 +1,4 @@
+import { assertMemberQuota } from "@/server/services/plans";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { AccountSummary, RegistrationInput, WorkspaceInvitation, WorkspaceMember, WorkspaceRole, WorkspaceSummary } from "@/lib/contracts";
 import { db } from "@/server/db";
@@ -88,6 +89,8 @@ export async function createWorkspaceInvitation(access: WorkspaceAccess, email: 
   await db.$transaction(async (tx) => {
     const actor = await tx.membership.findFirst({ where: { id: access.membership.id, workspaceId: access.workspaceId, userId: access.user.id, status: "ACTIVE", role: { in: ["OWNER","ADMIN"] } } });
     if (!actor) throw new AppError("FORBIDDEN", "You do not have access to this workspace action.", 403);
+    const priorPending = await tx.workspaceInvitation.findFirst({ where: { workspaceId: access.workspaceId, email: normalized, status: "PENDING" }, select: { id: true } });
+    if (!priorPending && !await tx.membership.findFirst({ where: { workspaceId: access.workspaceId, user: { email: normalized }, status: "ACTIVE" } })) await assertMemberQuota(tx, access.workspaceId);
     if (await tx.membership.findFirst({ where: { workspaceId: access.workspaceId, user: { email: normalized }, status: "ACTIVE" } })) { createActionToken("WORKSPACE_INVITATION", invitationTokenBinding(access.workspaceId, normalized, role, 1), newId); return; }
     const prior = await tx.workspaceInvitation.findUnique({ where: { workspaceId_email_status: { workspaceId: access.workspaceId, email: normalized, status: "PENDING" } } });
     const id = prior?.id ?? newId; const version = (prior?.tokenVersion ?? 0) + 1; const binding = invitationTokenBinding(access.workspaceId, normalized, role, version); const authority = createActionToken("WORKSPACE_INVITATION", binding, id); const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60_000);

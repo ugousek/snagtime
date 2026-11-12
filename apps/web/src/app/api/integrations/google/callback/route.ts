@@ -3,8 +3,9 @@ import { AppError } from "@/server/errors";
 import { apiError } from "@/server/http";
 import { consumeGoogleAuthorization } from "@/server/services/calendar";
 import { clientAddress, enforceRateLimit } from "@/server/rate-limit";
+import { withDatabaseScope } from "@/server/db-context";
 
-export async function GET(request: Request) {
+async function GETHandler(request: Request) {
   try {
     const session = await getSessionRecord(request); await enforceRateLimit(`google-callback:${session ? `user:${session.userId}` : clientAddress(request)}`, 20, 15 * 60_000);
     const query = new URL(request.url).searchParams; const code = query.get("code"); const state = query.get("state");
@@ -13,3 +14,5 @@ export async function GET(request: Request) {
     return Response.redirect(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/integrations?google=connected`);
   } catch (error) { return apiError(error); }
 }
+
+export const GET = withDatabaseScope(GETHandler);

@@ -3,10 +3,14 @@ import { apiError, jsonBody, ok } from "@/server/http";
 import { invitationInput } from "@/server/validation";
 import { createWorkspaceInvitation, listWorkspaceInvitations } from "@/server/services/accounts";
 import { enforceRateLimit } from "@/server/rate-limit";
+import { withDatabaseScope } from "@/server/db-context";
 
-export async function GET(request: Request) {
+async function GETHandler(request: Request) {
   try { const access = await requireWorkspaceAccess(request, "ADMIN"); return ok(await listWorkspaceInvitations(access.workspaceId)); } catch (error) { return apiError(error); }
 }
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   try { const access = await requireWorkspaceMutationAccess(request, "ADMIN"); await enforceRateLimit(`invite:workspace:${access.workspaceId}`, 30, 60 * 60_000); const input = invitationInput.parse(await jsonBody(request)); return ok(await createWorkspaceInvitation(access, input.email, input.role), { status: 202 }); } catch (error) { return apiError(error); }
 }
+
+export const GET = withDatabaseScope(GETHandler);
+export const POST = withDatabaseScope(POSTHandler);

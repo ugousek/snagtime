@@ -55,6 +55,7 @@ model Workspace {
   localInboxMessages    LocalInboxMessage[]
   accountActionTokens   AccountActionToken[]
   bookingRecoveryTokens BookingRecoveryToken[]
+  plan                  WorkspacePlan?
 }
 
 model Membership {
@@ -519,4 +520,15 @@ model WorkerHeartbeat {
   buildId    String
 
   @@index([lastSeenAt])
+}
+
+// Subscription plan of a workspace (SaaS tariff). A missing row means the free plan. Only the
+// platform operator changes it; workspaces can read their own row.
+model WorkspacePlan {
+  workspaceId String    @id
+  plan        String    @default("FREE")
+  validUntil  DateTime?
+  note        String?
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }

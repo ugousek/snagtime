@@ -2,9 +2,10 @@ import { AppError } from "@/server/errors";
 import { apiError, ok } from "@/server/http";
 import { listPublicSlots } from "@/server/services/bookings";
 import { clientAddress, enforceRateLimit } from "@/server/rate-limit";
+import { withDatabaseScope } from "@/server/db-context";
 
 type Context = { params: Promise<{ slug: string }> };
-export async function GET(request: Request, context: Context) {
+async function GETHandler(request: Request, context: Context) {
   try {
     const { slug } = await context.params;
     await enforceRateLimit(`public-slots:${clientAddress(request)}`, 120, 60_000);
@@ -16,3 +17,5 @@ export async function GET(request: Request, context: Context) {
     return ok(await listPublicSlots(slug, from, to, timeZone, undefined, durationId));
   } catch (error) { return apiError(error); }
 }
+
+export const GET = withDatabaseScope(GETHandler);

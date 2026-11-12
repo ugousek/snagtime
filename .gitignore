@@ -17,3 +17,7 @@ prisma/postgresql/node_modules/
 tmp/implementation-*
 runtime/
 .next-playwright/
+
+# Self-hosted deployment
+deploy/.env
+deploy/secrets/
