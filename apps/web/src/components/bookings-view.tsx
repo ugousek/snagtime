@@ -29,7 +29,7 @@ function answerText(value: unknown) {
 export function BookingsView() {
   const { canManage } = useWorkspaceAccess();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("q") ?? "");
   const [status, setStatus] = useState<"all" | BookingStatus>("all");
   const [selected, setSelected] = useState<Booking | null>(null);
   const [workspaceTimeZone, setWorkspaceTimeZone] = useState("UTC");

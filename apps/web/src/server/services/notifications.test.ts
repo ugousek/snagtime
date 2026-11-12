@@ -114,30 +114,49 @@ describe("transactional email and recovery authority", () => {
     const owner = await fixture("email-stale"); const event = await db.eventType.create({ data: { workspaceId: owner.workspace.id, ownerId: owner.user.id, name: "Stale event", slug: `stale-${randomUUID()}`, locationType: "CUSTOM" } });
     let booking = await db.booking.create({ data: { workspaceId: owner.workspace.id, eventTypeId: event.id, hostId: owner.user.id, durationMinutes: 30, inviteeName: "Guest", inviteeEmail: "stale@example.com", inviteeTimeZone: "America/Chicago", startAt: new Date("2099-01-01T10:00:00Z"), endAt: new Date("2099-01-01T10:30:00Z"), eventTitleSnapshot: "Stale event", capabilityVersion: randomUUID(), manageExpiresAt: new Date("2099-02-01T00:00:00Z") } });
     await db.$transaction((tx) => enqueueBookingEmail(tx, booking, "BOOKING_CONFIRMED")); booking = await db.booking.update({ where: { id: booking.id }, data: { mutationVersion: 1, startAt: new Date("2099-01-02T10:00:00Z"), endAt: new Date("2099-01-02T10:30:00Z") } }); await db.$transaction((tx) => enqueueBookingEmail(tx, booking, "BOOKING_RESCHEDULED"));
-    await db.emailOutbox.updateMany({ where: { bookingId: booking.id, bookingMutationVersion: 1 }, data: { status: "PROCESSING", leaseToken: "dead", leaseExpiresAt: new Date("2020-01-01Z") } });
+    await db.emailOutbox.updateMany({ where: { bookingId: booking.id, bookingMutationVersion: 1, kind: { not: "BOOKING_REMINDER" } }, data: { status: "PROCESSING", leaseToken: "dead", leaseExpiresAt: new Date("2020-01-01Z") } });
     const provider = new CaptureProvider(); await processEmailOutbox(owner.workspace.id, new Date(), provider); await processEmailOutbox(owner.workspace.id, new Date(), provider);
-    expect(provider.messages).toHaveLength(2); expect(provider.messages.every((message) => message.text.includes("rescheduled"))).toBe(true); expect(await db.emailOutbox.count({ where: { bookingId: booking.id, status: "SUPERSEDED" } })).toBe(2); expect(await db.emailOutbox.count({ where: { bookingId: booking.id, status: "COMPLETED" } })).toBe(2);
+    expect(provider.messages).toHaveLength(2); expect(provider.messages.every((message) => message.text.includes("přesun"))).toBe(true); expect(await db.emailOutbox.count({ where: { bookingId: booking.id, status: "SUPERSEDED" } })).toBe(2); expect(await db.emailOutbox.count({ where: { bookingId: booking.id, status: "COMPLETED" } })).toBe(2);
   });
 
   it("notifies the calendar owner without exposing invitee booking authority", async () => {
     const owner = await fixture("owner-notification"); const event = await db.eventType.create({ data: { workspaceId: owner.workspace.id, ownerId: owner.user.id, name: "Owner event", slug: `owner-${randomUUID()}`, locationType: "CUSTOM" } });
     const booking = await db.booking.create({ data: { workspaceId: owner.workspace.id, eventTypeId: event.id, hostId: owner.user.id, durationMinutes: 30, inviteeName: "Taylor Guest", inviteeEmail: "taylor@example.com", inviteeTimeZone: "America/New_York", startAt: new Date("2099-01-03T16:00:00Z"), endAt: new Date("2099-01-03T16:30:00Z"), eventTitleSnapshot: "Owner event", capabilityVersion: randomUUID(), manageExpiresAt: new Date("2099-02-03T00:00:00Z") } });
     await db.$transaction((tx) => enqueueBookingEmail(tx, booking, "BOOKING_CONFIRMED"));
-    expect(await db.emailOutbox.count({ where: { bookingId: booking.id } })).toBe(2);
+    expect(await db.emailOutbox.count({ where: { bookingId: booking.id, kind: { not: "BOOKING_REMINDER" } } })).toBe(2); expect(await db.emailOutbox.count({ where: { bookingId: booking.id, kind: "BOOKING_REMINDER" } })).toBe(1);
     const provider = new CaptureProvider(); await processEmailOutbox(owner.workspace.id, new Date(), provider);
     const invitee = provider.messages.find((message) => message.recipientEmail === booking.inviteeEmail)!; const organizer = provider.messages.find((message) => message.recipientEmail === owner.user.email)!;
-    expect(invitee.text).toContain(`/manage/${booking.id}/reschedule#recovery=`); expect(invitee.text).not.toContain(`/manage/${booking.id}/reschedule?recovery=`); expect(invitee.replyTo).toBe("support@example.invalid"); expect(organizer.subject).toBe("New booking: Owner event"); expect(organizer.replyTo).toBe("taylor@example.com"); expect(organizer.text).toContain("Taylor Guest (taylor@example.com) confirmed Owner event"); expect(organizer.text).toContain(`/bookings?selected=${booking.id}`); expect(organizer.text).not.toContain("recovery=");
+    expect(invitee.text).toContain(`/manage/${booking.id}/reschedule#recovery=`); expect(invitee.text).not.toContain(`/manage/${booking.id}/reschedule?recovery=`); expect(invitee.replyTo).toBe("support@example.invalid"); expect(organizer.subject).toBe("Nová rezervace: Owner event"); expect(organizer.replyTo).toBe("taylor@example.com"); expect(organizer.text).toContain("Taylor Guest (taylor@example.com) si rezervoval(a) termín"); expect(organizer.text).toContain("Služba: Owner event"); expect(organizer.text).toContain(`/bookings?selected=${booking.id}`); expect(organizer.text).not.toContain("recovery=");
+  });
+
+  it("sends a reminder a day before and drops it when the booking changes", async () => {
+    const owner = await fixture("reminder"); const event = await db.eventType.create({ data: { workspaceId: owner.workspace.id, ownerId: owner.user.id, name: "Reminder event", slug: `reminder-${randomUUID()}`, locationType: "CUSTOM" } });
+    const startAt = new Date("2099-06-01T10:00:00Z");
+    const booking = await db.booking.create({ data: { workspaceId: owner.workspace.id, eventTypeId: event.id, hostId: owner.user.id, durationMinutes: 30, inviteeName: "Reminded", inviteeEmail: "reminded@example.com", inviteeTimeZone: "Europe/Prague", startAt, endAt: new Date("2099-06-01T10:30:00Z"), eventTitleSnapshot: "Reminder event", capabilityVersion: randomUUID(), manageExpiresAt: new Date("2099-07-01T00:00:00Z") } });
+    await db.$transaction((tx) => enqueueBookingEmail(tx, booking, "BOOKING_CONFIRMED"));
+    const early = new CaptureProvider(); await processEmailOutbox(owner.workspace.id, new Date(), early);
+    expect(early.messages.some((message) => message.subject.startsWith("Připomínka"))).toBe(false);
+    const due = new CaptureProvider(); await processEmailOutbox(owner.workspace.id, new Date(startAt.getTime() - 23 * 60 * 60_000), due);
+    const reminder = due.messages.find((message) => message.subject.startsWith("Připomínka"))!;
+    expect(reminder.recipientEmail).toBe("reminded@example.com"); expect(reminder.text).toContain("připomínáme"); expect(reminder.text).toContain("12:00"); expect(reminder.text).toContain(`/manage/${booking.id}/reschedule#recovery=`);
+
+    const other = await db.booking.create({ data: { workspaceId: owner.workspace.id, eventTypeId: event.id, hostId: owner.user.id, durationMinutes: 30, inviteeName: "Cancels", inviteeEmail: "cancels@example.com", inviteeTimeZone: "UTC", startAt, endAt: new Date("2099-06-01T10:30:00Z"), eventTitleSnapshot: "Reminder event", capabilityVersion: randomUUID(), manageExpiresAt: new Date("2099-07-01T00:00:00Z") } });
+    await db.$transaction((tx) => enqueueBookingEmail(tx, other, "BOOKING_CONFIRMED"));
+    await db.booking.update({ where: { id: other.id }, data: { status: "CANCELLED", mutationVersion: 1 } });
+    const after = new CaptureProvider(); await processEmailOutbox(owner.workspace.id, new Date(startAt.getTime() - 23 * 60 * 60_000), after);
+    expect(after.messages.some((message) => message.recipientEmail === "cancels@example.com" && message.subject.startsWith("Připomínka"))).toBe(false);
+    expect(await db.emailOutbox.findFirstOrThrow({ where: { bookingId: other.id, kind: "BOOKING_REMINDER" } })).toMatchObject({ status: "SUPERSEDED" });
   });
 
   it("queues distinct invitee and organizer notices when both use the same address", async () => {
     const owner = await fixture("same-address"); const event = await db.eventType.create({ data: { workspaceId: owner.workspace.id, ownerId: owner.user.id, name: "Same address event", slug: `same-address-${randomUUID()}`, locationType: "CUSTOM" } });
     const booking = await db.booking.create({ data: { workspaceId: owner.workspace.id, eventTypeId: event.id, hostId: owner.user.id, durationMinutes: 30, inviteeName: "Owner as invitee", inviteeEmail: owner.user.email, inviteeTimeZone: "UTC", startAt: new Date("2099-04-01T10:00:00Z"), endAt: new Date("2099-04-01T10:30:00Z"), eventTitleSnapshot: "Same address event", capabilityVersion: randomUUID(), manageExpiresAt: new Date("2099-05-01T00:00:00Z") } });
     await db.$transaction((tx) => enqueueBookingEmail(tx, booking, "BOOKING_CONFIRMED"));
-    expect(await db.emailOutbox.count({ where: { bookingId: booking.id } })).toBe(2);
+    expect(await db.emailOutbox.count({ where: { bookingId: booking.id, kind: { not: "BOOKING_REMINDER" } } })).toBe(2); expect(await db.emailOutbox.count({ where: { bookingId: booking.id, kind: "BOOKING_REMINDER" } })).toBe(1);
     const provider = new CaptureProvider(); await processEmailOutbox(owner.workspace.id, new Date(), provider);
     expect(provider.messages).toHaveLength(2); expect(new Set(provider.messages.map((message) => message.subject)).size).toBe(2);
-    expect(provider.messages.find((message) => message.subject.startsWith("New booking:"))?.replyTo).toBe(owner.user.email);
-    expect(provider.messages.find((message) => !message.subject.startsWith("New booking:"))?.replyTo).toBe("support@example.invalid");
+    expect(provider.messages.find((message) => message.subject.startsWith("Nová rezervace:"))?.replyTo).toBe(owner.user.email);
+    expect(provider.messages.find((message) => !message.subject.startsWith("Nová rezervace:"))?.replyTo).toBe("support@example.invalid");
   });
 
   it("encrypts the bounded local inbox and disables it outside explicit demo mode", async () => {

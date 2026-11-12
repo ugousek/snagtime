@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   agentRules: false,
   async headers() {
-    return [{ source: "/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] }];
+    return [{ source: "/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }, { key: "X-Frame-Options", value: "DENY" }, { key: "Content-Security-Policy", value: "frame-ancestors 'none'" }, { key: "X-Content-Type-Options", value: "nosniff" }] }];
   },
 };
 

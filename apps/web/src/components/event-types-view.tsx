@@ -8,12 +8,20 @@ import { Icon } from "./icons";
 import { Badge, ButtonLink, PageHeader, Toggle } from "./ui";
 import { useWorkspaceAccess } from "./workspace-access";
 
+/** HTML for a "book online" button that a business pastes into its own website. It opens the
+ * booking page in a new tab, so the booking keeps working where third-party cookies are blocked. */
+export function bookingButtonSnippet(url: string, color: string) {
+  const safeColor = /^#[0-9a-f]{3,8}$/i.test(color) ? color : "#2563EB";
+  return `<a href="${url.replace(/"/g, "%22")}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 22px;border-radius:8px;background:${safeColor};color:#fff;font:600 16px/1.2 system-ui,sans-serif;text-decoration:none">Rezervovat online</a>`;
+}
+
 export function EventTypesView() {
   const { canManage } = useWorkspaceAccess();
   const [events, setEvents] = useState<EventType[]>([]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "published" | "draft">("all");
   const [copiedId, setCopiedId] = useState("");
+  const [copiedEmbedId, setCopiedEmbedId] = useState("");
   const [savingId, setSavingId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -22,6 +30,10 @@ export function EventTypesView() {
   const copyLink = async (event: EventType) => {
     try { await navigator.clipboard.writeText(`${window.location.origin}/book/${event.slug}`); setCopiedId(event.id); window.setTimeout(() => setCopiedId(""), 1800); }
     catch { setError("Rezervační odkaz se nepodařilo zkopírovat. Otevřete ho a zkopírujte adresu z prohlížeče."); }
+  };
+  const copyEmbed = async (event: EventType) => {
+    try { await navigator.clipboard.writeText(bookingButtonSnippet(`${window.location.origin}/book/${event.slug}`, event.color)); setCopiedEmbedId(event.id); window.setTimeout(() => setCopiedEmbedId(""), 2400); }
+    catch { setError("Kód tlačítka se nepodařilo zkopírovat."); }
   };
   const toggle = async (id: string) => {
     if (savingId) return;
@@ -45,9 +57,9 @@ export function EventTypesView() {
       {filtered.map((event) => <article className="event-card" key={event.id}>
         <div className="event-card-accent" style={{ background: event.color }} />
         <div className="event-card-head"><Badge tone={event.status === "published" ? "success" : "neutral"} dot>{event.status === "published" ? "Zveřejněno" : "Koncept"}</Badge></div>
-        <div className="event-card-body"><h2>{event.title}</h2><p>{event.description}</p><div className="event-meta"><span><Icon name="clock" />{event.durations.map((item) => item.label).join(", ")}</span><span><Icon name="video" />{event.location}</span><span><Icon name="team" />{event.hostName}</span><span><Icon name="bookings" />{event.bookingCount} {event.bookingCount === 1 ? "booking" : "bookings"}</span></div></div>
+        <div className="event-card-body"><h2>{event.title}</h2><p>{event.description}</p><div className="event-meta"><span><Icon name="clock" />{event.durations.map((item) => item.label).join(", ")}</span><span><Icon name="video" />{event.location}</span><span><Icon name="team" />{event.hostName}</span><span><Icon name="bookings" />{event.bookingCount} {event.bookingCount === 1 ? "rezervace" : event.bookingCount >= 2 && event.bookingCount <= 4 ? "rezervace" : "rezervací"}</span></div></div>
         <div className="event-card-link"><span suppressHydrationWarning>{typeof window === "undefined" ? `/book/${event.slug}` : `${window.location.origin}/book/${event.slug}`}</span><button type="button" onClick={() => copyLink(event)} aria-label={`Zkopírovat rezervační odkaz pro ${event.title}`}>{copiedId === event.id ? <Icon name="check" /> : <Icon name="copy" />}</button><Link href={`/book/${event.slug}`} aria-label="Otevřít rezervační stránku"><Icon name="external" /></Link></div>
-        <div className="event-card-foot"><Toggle checked={event.status === "published"} onChange={() => void toggle(event.id)} label={`${event.status === "published" ? "Unpublish" : "Publish"} ${event.title}`} disabled={savingId === event.id} /><span>{savingId === event.id ? "Ukládám…" : event.status === "published" ? "Přijímá rezervace" : "Neveřejné"}</span><Link className="button button-secondary button-sm" href={`/event-types/${event.id}`}>Upravit</Link></div>
+        <div className="event-card-foot"><Toggle checked={event.status === "published"} onChange={() => void toggle(event.id)} label={`${event.status === "published" ? "Skrýt" : "Zveřejnit"} ${event.title}`} disabled={savingId === event.id} /><span>{savingId === event.id ? "Ukládám…" : event.status === "published" ? "Přijímá rezervace" : "Neveřejné"}</span><button type="button" className="button button-ghost button-sm" onClick={() => void copyEmbed(event)} title="Zkopíruje HTML kód tlačítka „Rezervovat online“ pro vložení na váš web">{copiedEmbedId === event.id ? "Zkopírováno" : "Kód na web"}</button><Link className="button button-secondary button-sm" href={`/event-types/${event.id}`}>Upravit</Link></div>
       </article>)}
     </div>
   </div>;

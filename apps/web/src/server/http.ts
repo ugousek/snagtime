@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { AppError } from "@/server/errors";
+import { czechMessage } from "@/server/messages-cs";
 
 export function ok<T>(data: T, init?: ResponseInit) {
   return NextResponse.json({ data }, init);
@@ -9,13 +10,13 @@ export function ok<T>(data: T, init?: ResponseInit) {
 export function apiError(error: unknown) {
   if (error instanceof ZodError) {
     return NextResponse.json(
-      { error: { code: "VALIDATION_ERROR", message: "Check the highlighted fields.", fieldErrors: error.flatten().fieldErrors } },
+      { error: { code: "VALIDATION_ERROR", message: czechMessage("Check the highlighted fields."), fieldErrors: error.flatten().fieldErrors } },
       { status: 422 },
     );
   }
   if (error instanceof AppError) {
     return NextResponse.json(
-      { error: { code: error.code, message: error.message, fieldErrors: error.fieldErrors } },
+      { error: { code: error.code, message: czechMessage(error.message), fieldErrors: error.fieldErrors } },
       { status: error.status },
     );
   }
@@ -23,7 +24,7 @@ export function apiError(error: unknown) {
   const prismaCode = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : undefined;
   const prismaModel = error && typeof error === "object" && "meta" in error && error.meta && typeof error.meta === "object" && "modelName" in error.meta && typeof error.meta.modelName === "string" ? error.meta.modelName : undefined;
   console.error("Unhandled API error", { type: error instanceof Error ? error.name : "unknown", code: prismaCode, model: prismaModel });
-  return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Something went wrong." } }, { status: 500 });
+  return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: czechMessage("Something went wrong.") } }, { status: 500 });
 }
 
 export async function readBoundedText(request: Request, maxBytes: number) {

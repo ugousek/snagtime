@@ -15,6 +15,7 @@ const navigation: { href: string; label: string; icon: IconName }[] = [
   { href: "/event-types", label: "Služby", icon: "event-types" },
   { href: "/availability", label: "Dostupnost", icon: "availability" },
   { href: "/bookings", label: "Rezervace", icon: "bookings" },
+  { href: "/clients", label: "Klienti", icon: "team" },
   { href: "/integrations", label: "Integrace", icon: "integrations" },
 ];
 
