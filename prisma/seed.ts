@@ -28,6 +28,7 @@ async function main() {
     update: {},
     create: { id: `ws_${host.id}`, name: "Barbershop Demo", timeZone: host.timeZone, onboardingCompletedAt: new Date() },
   });
+  await prisma.workspacePlan.upsert({ where: { workspaceId: workspace.id }, update: {}, create: { workspaceId: workspace.id, plan: "PROFI", note: "Demo" } });
   await prisma.membership.upsert({
     where: { workspaceId_userId: { workspaceId: workspace.id, userId: host.id } },
     update: { role: "OWNER", status: "ACTIVE" },

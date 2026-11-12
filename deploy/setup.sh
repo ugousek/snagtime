@@ -32,7 +32,7 @@ say "Tajné klíče"
 install -d -m 0700 "$SECRETS"
 for name in postgres_owner_password auth_secret booking_capability_secret email_token_secret tenant_context_secret \
             rate_limit_hash_secret proxy_shared_secret operator_health_secret \
-            db_migration_password db_app_password db_worker_password db_monitor_password; do
+            db_migration_password db_app_password db_worker_password db_monitor_password db_platform_password; do
   put "$name" "$(rand 32)"
 done
 put token_encryption_key "$(rand 32)"
@@ -66,6 +66,7 @@ url() { printf 'postgresql://%s:%s@postgres:5432/tempocove?%s' "$1" "$(cat "$SEC
 url tempocove_app_login db_app_password "$RUNTIME" > "$SECRETS/app_database_url.new"
 url tempocove_worker_login db_worker_password "$RUNTIME" > "$SECRETS/worker_database_url.new"
 mv "$SECRETS/app_database_url.new" "$SECRETS/app_database_url"; mv "$SECRETS/worker_database_url.new" "$SECRETS/worker_database_url"
+url tempocove_platform_login db_platform_password "$RUNTIME" > "$SECRETS/platform_database_url"
 # Schema changes (ALTER TABLE, policies) need the table owner, so migrations run as the owner.
 # These credentials are mounted only into the short-lived migration container, never into web/worker.
 url tempocove_owner postgres_owner_password "$TLS&connect_timeout=5" > "$SECRETS/migration_database_url"
@@ -78,8 +79,9 @@ say "Databáze"
 "${DC[@]}" up -d --wait postgres
 migrated="$("${DC[@]}" exec -T postgres sh -c 'PGPASSWORD="$(cat /run/secrets/postgres_owner_password)" psql -U tempocove_owner -d tempocove -tAc "SELECT to_regclass('"'"'public.\"User\"'"'"') IS NOT NULL"')"
 "${DC[@]}" --profile migration run --rm migration
-if [ "$migrated" != "t" ]; then
-  echo "První instalace: zakládám databázové účty."
+# Logins are (re)provisioned on every run: it is idempotent and picks up roles added by new migrations.
+[ "$migrated" = "t" ] || echo "První instalace: zakládám databázové účty."
+{
   "${DC[@]}" run --rm --no-deps -T \
     -v "$REPO_DIR/scripts/provision-postgres-logins.mjs:/app/scripts/provision-postgres-logins.mjs:ro" \
     -e DATABASE_URL_FILE= \
@@ -88,9 +90,10 @@ if [ "$migrated" != "t" ]; then
     -e TEMPOCOVE_APP_DB_PASSWORD="$(cat "$SECRETS/db_app_password")" \
     -e TEMPOCOVE_WORKER_DB_PASSWORD="$(cat "$SECRETS/db_worker_password")" \
     -e TEMPOCOVE_MONITOR_DB_PASSWORD="$(cat "$SECRETS/db_monitor_password")" \
+    -e TEMPOCOVE_PLATFORM_DB_PASSWORD="$(cat "$SECRETS/db_platform_password")" \
     -e TENANT_CONTEXT_SECRET="$(cat "$SECRETS/tenant_context_secret")" \
     web node scripts/provision-postgres-logins.mjs
-fi
+}
 
 say "Spouštím aplikaci"
 "${DC[@]}" up -d --remove-orphans web worker caddy

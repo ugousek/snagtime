@@ -2,6 +2,9 @@
 // rely on them); apiError() translates at the HTTP boundary. Unknown messages pass through unchanged.
 const exact: Record<string, string> = {
   "Check the highlighted fields.": "Zkontrolujte zvýrazněná pole.",
+  "This business cannot accept more online bookings this month.": "Tato provozovna už tento měsíc nepřijímá další online rezervace. Kontaktujte ji prosím přímo.",
+  "Your plan does not allow more team members.": "Váš tarif nedovoluje přidat dalšího člena týmu. Přejděte na vyšší tarif v Nastavení.",
+  "The operator console is not configured.": "Správa provozoven není nastavená.",
   "Something went wrong.": "Něco se pokazilo. Zkuste to prosím znovu.",
   "Sign in to continue.": "Pro pokračování se přihlaste.",
   "Email or password is invalid.": "E-mail nebo heslo není správné.",
@@ -45,7 +48,7 @@ const exact: Record<string, string> = {
   "Google did not grant every required Calendar capability. Reconnect and approve both Calendar permissions.": "Google neudělil všechna oprávnění ke kalendáři. Připojte ho znovu a povolte obě oprávnění.",
   "Google did not return durable offline access. Reconnect and approve consent.": "Google nepovolil trvalý přístup. Připojte kalendář znovu a potvrďte souhlas.",
 };
-const resources: Record<string, string> = { Booking: "Rezervace", "Event type": "Služba", "Duration option": "Varianta délky", Membership: "Členství" };
+const resources: Record<string, string> = { Booking: "Rezervace", "Event type": "Služba", "Duration option": "Varianta délky", Membership: "Členství", Workspace: "Provozovna" };
 const patterns: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
   [/^(.+) was not found\.$/, (m) => `${resources[m[1]!] ?? m[1]} nebyla nalezena.`],
   [/^Answer required: (.+)$/, (m) => `Vyplňte prosím: ${m[1]}`],

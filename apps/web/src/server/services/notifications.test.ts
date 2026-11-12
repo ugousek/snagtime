@@ -76,6 +76,7 @@ describe("transactional email and recovery authority", () => {
 
   it("binds invitation acceptance to verified email, stored role, workspace, and live inviter", async () => {
     const inviter = await fixture("inviter"); const target = await fixture("target"); const wrong = await fixture("wrong");
+    await db.workspacePlan.create({ data: { workspaceId: inviter.workspace.id, plan: "PROFI" } });
     await expect(createWorkspaceInvitation(inviter.access, target.user.email, "MEMBER")).resolves.toEqual({ accepted: true }); const provider = new CaptureProvider(); await processEmailOutbox(inviter.workspace.id, new Date(), provider); expect(provider.messages[0]!.text).toContain("/invite/accept#token="); expect(provider.messages[0]!.text).not.toContain("/invite/accept?token="); const token = linkToken(provider.messages[0]!.text);
     await expect(acceptWorkspaceInvitation(wrong.access, token)).rejects.toMatchObject({ code: "INVALID_OR_EXPIRED_TOKEN" });
     await db.membership.create({ data: { workspaceId: inviter.workspace.id, userId: wrong.user.id, role: "OWNER" } });

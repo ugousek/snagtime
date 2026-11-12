@@ -77,7 +77,10 @@ services:
       RATE_LIMIT_PROVIDER: postgresql
       RATE_LIMIT_MAX_BUCKETS: "100000"
       TRUST_PROXY: "true"
-    secrets: [app_database_url, postgres_ca_cert, auth_secret, booking_capability_secret, booking_capability_keyring, token_encryption_key, email_token_secret, tenant_context_secret, rate_limit_hash_secret, proxy_shared_secret, operator_health_secret, google_client_secret, stripe_secret_key, stripe_webhook_secret, smtp_password]
+      PLATFORM_DATABASE_URL_FILE: /run/secrets/platform_database_url
+      PLATFORM_ADMIN_EMAILS: ${PLATFORM_ADMIN_EMAILS:-}
+      PLATFORM_CONTACT_EMAIL: ${PLATFORM_CONTACT_EMAIL:-}
+    secrets: [platform_database_url, app_database_url, postgres_ca_cert, auth_secret, booking_capability_secret, booking_capability_keyring, token_encryption_key, email_token_secret, tenant_context_secret, rate_limit_hash_secret, proxy_shared_secret, operator_health_secret, google_client_secret, stripe_secret_key, stripe_webhook_secret, smtp_password]
     depends_on: { postgres: { condition: service_healthy } }
     restart: unless-stopped
     expose: ["3000"]
@@ -114,6 +117,7 @@ secrets:
   postgres_ca_cert: { file: ./secrets/postgres_ca_cert }
   migration_database_url: { file: ./secrets/migration_database_url }
   app_database_url: { file: ./secrets/app_database_url }
+  platform_database_url: { file: ./secrets/platform_database_url }
   worker_database_url: { file: ./secrets/worker_database_url }
   auth_secret: { file: ./secrets/auth_secret }
   booking_capability_secret: { file: ./secrets/booking_capability_secret }

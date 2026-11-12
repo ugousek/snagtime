@@ -1,3 +1,4 @@
+import { assertBookingQuota } from "@/server/services/plans";
 import { createHash } from "node:crypto";
 import { DateTime } from "luxon";
 import type { BookingManageCapabilities, CreateBookingInput, CreateBookingResult, ResumeBookingCheckoutResult } from "@/lib/contracts";
@@ -157,6 +158,7 @@ export async function createBooking(
   let created;
   try {
     created = await withDatabaseTransactionRetry((remainingMs) => db.$transaction(async (tx) => {
+      await assertBookingQuota(tx, eventType.workspaceId);
       const booking = await tx.booking.create({ data: {
         workspaceId: eventType.workspaceId, eventTypeId: eventType.id, hostId: eventType.ownerId, durationId: duration.id,
         durationMinutes: duration.durationMinutes, priceCents: duration.priceCents, currency: duration.currency,
