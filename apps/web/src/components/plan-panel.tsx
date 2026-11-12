@@ -26,7 +26,7 @@ export function PlanPanel() {
       <div><small>Platí do</small><strong>{summary.validUntil && summary.plan !== "FREE" ? new Date(summary.validUntil).toLocaleDateString("cs-CZ", { timeZone: "UTC" }) : "bez omezení"}</strong></div>
     </div>
     <div className="plan-grid">{summary.plans.map((plan) => <div key={plan.id} className={plan.id === summary.plan ? "plan-card is-current" : "plan-card"}>
-      <strong>{plan.name}</strong><span className="plan-price">{czk(plan.priceCzk)}<small> / měsíc</small></span>
+      <strong>{plan.name}</strong><span className="plan-price">{czk(plan.priceCzk)}<small> / měsíc</small></span>{plan.yearlyPriceCzk > 0 && <small className="plan-yearly">nebo {czk(plan.yearlyPriceCzk)} ročně (2 měsíce zdarma)</small>}
       <ul><li>{plan.monthlyBookings == null ? "Neomezeně rezervací" : `${plan.monthlyBookings} rezervací měsíčně`}</li><li>{plan.members === 1 ? "1 uživatel" : `až ${plan.members} členů týmu`}</li><li>České e-maily a připomínky</li></ul>
       {plan.id === summary.plan ? <Badge tone="success">Aktuální tarif</Badge> : mail ? <a className="button button-secondary button-sm" href={`${mail}&body=${encodeURIComponent(`Dobrý den, chci přejít na tarif ${plan.name}.`)}`}>Chci tento tarif</a> : null}
     </div>)}</div>

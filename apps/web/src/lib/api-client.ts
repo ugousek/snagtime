@@ -51,7 +51,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export type PlanId = "FREE" | "START" | "PROFI";
-export type PlanInfo = { id: PlanId; name: string; priceCzk: number; monthlyBookings: number | null; members: number };
+export type PlanInfo = { id: PlanId; name: string; priceCzk: number; yearlyPriceCzk: number; monthlyBookings: number | null; members: number };
 export type WorkspacePlanSummary = { plan: PlanId; storedPlan: PlanId; validUntil: string | null; usage: { monthlyBookings: number; members: number }; plans: PlanInfo[]; contactEmail: string | null; platformAdmin: boolean };
 export type PlatformWorkspace = { id: string; name: string; createdAt: string; owners: { name: string; email: string }[]; members: number; services: number; monthlyBookings: number; plan: PlanId; storedPlan: PlanId; validUntil: string | null; note: string | null };
 

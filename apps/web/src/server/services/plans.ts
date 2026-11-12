@@ -4,10 +4,10 @@ import { AppError } from "@/server/errors";
 
 /** SaaS plans. Prices are shown to customers; billing itself is handled by the operator (invoice). */
 export const PLANS = {
-  FREE: { name: "Zdarma", priceCzk: 0, monthlyBookings: 50, members: 1 },
-  START: { name: "Start", priceCzk: 249, monthlyBookings: 500, members: 3 },
-  PROFI: { name: "Profi", priceCzk: 549, monthlyBookings: null, members: 15 },
-} as const satisfies Record<string, { name: string; priceCzk: number; monthlyBookings: number | null; members: number }>;
+  FREE: { name: "Zdarma", priceCzk: 0, yearlyPriceCzk: 0, monthlyBookings: 50, members: 1 },
+  START: { name: "Start", priceCzk: 199, yearlyPriceCzk: 1990, monthlyBookings: 500, members: 3 },
+  PROFI: { name: "Profi", priceCzk: 399, yearlyPriceCzk: 3990, monthlyBookings: null, members: 15 },
+} as const satisfies Record<string, { name: string; priceCzk: number; yearlyPriceCzk: number; monthlyBookings: number | null; members: number }>;
 export type PlanId = keyof typeof PLANS;
 export const PLAN_IDS = Object.keys(PLANS) as PlanId[];
 export function isPlanId(value: unknown): value is PlanId { return typeof value === "string" && value in PLANS; }

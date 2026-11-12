@@ -6,7 +6,7 @@ import { Icon } from "./icons";
 import { Badge, PageHeader } from "./ui";
 
 const planNames: Record<PlanId, string> = { FREE: "Zdarma", START: "Start", PROFI: "Profi" };
-const planPrices: Record<PlanId, number> = { FREE: 0, START: 249, PROFI: 549 };
+const planPrices: Record<PlanId, number> = { FREE: 0, START: 199, PROFI: 399 };
 type Draft = { plan: PlanId; validUntil: string; note: string };
 const dateInput = (iso: string | null) => iso ? iso.slice(0, 10) : "";
 
