@@ -17,7 +17,7 @@ export function mapEventType(eventType: EventWithOptions): EventTypeSummary {
     locationType: eventType.locationType as EventTypeSummary["locationType"], locationValue: eventType.locationValue,
     isActive: eventType.isActive, bufferBeforeMinutes: eventType.bufferBeforeMinutes,
     bufferAfterMinutes: eventType.bufferAfterMinutes, minimumNoticeMinutes: eventType.minimumNoticeMinutes,
-    bookingWindowDays: eventType.bookingWindowDays, priceCents: eventType.priceCents, currency: eventType.currency,
+    bookingWindowDays: eventType.bookingWindowDays, capacity: eventType.capacity ?? 1, priceCents: eventType.priceCents, currency: eventType.currency,
     bookingUrl: `/book/${eventType.slug}`,
     durations,
     questions: eventType.questions?.map((item) => ({

@@ -113,6 +113,7 @@ model EventType {
   bookingWindowDays    Int       @default(60)
   priceCents           Int       @default(0)
   currency             String    @default("usd")
+  capacity             Int       @default(1)
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
   owner                User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -292,10 +293,12 @@ model BookingOccupancy {
   bookingId   String
   hostId      String
   minuteStart DateTime
+  // Place number in a group session (0 for one-to-one services). One person or one seat per minute.
+  seat        Int      @default(0)
   booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@unique([workspaceId, hostId, minuteStart])
+  @@unique([workspaceId, hostId, minuteStart, seat])
   @@index([bookingId])
 }
 

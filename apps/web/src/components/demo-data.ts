@@ -10,7 +10,7 @@ export interface EventType {
   id: string; title: string; slug: string; description: string; color: string; status: EventStatus;
   location: string; locationType: "GOOGLE_MEET" | "PHONE" | "IN_PERSON" | "CUSTOM"; locationValue: string | null;
   durations: DurationOption[]; questions: CustomQuestionView[];
-  bookingWindowDays: number; bufferBeforeMinutes: number;
+  bookingWindowDays: number; capacity: number; bufferBeforeMinutes: number;
   bufferAfterMinutes: number; minimumNoticeMinutes: number; bookingCount: number; hostName: string; branding?: WorkspaceBranding | null;
 }
 export interface Booking {

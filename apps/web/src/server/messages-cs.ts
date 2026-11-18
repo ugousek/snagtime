@@ -16,6 +16,7 @@ const exact: Record<string, string> = {
   "A valid Idempotency-Key header is required.": "Chybí identifikátor požadavku. Obnovte stránku a zkuste to znovu.",
   "That time is no longer available.": "Tento termín už není volný.",
   "That time was just booked. Choose another slot.": "Tento termín si právě někdo rezervoval. Vyberte prosím jiný.",
+  "This time slot is fully booked.": "Tento termín je plně obsazen. Vyberte prosím jiný.",
   "That booking link is already in use.": "Tato adresa služby už je obsazená. Zvolte jinou.",
   "That idempotency key was already used for a different booking request.": "Tento požadavek už byl použit pro jinou rezervaci. Obnovte stránku.",
   "The booking database is busy. Retry the same request.": "Systém je právě vytížený. Zkuste to prosím znovu.",

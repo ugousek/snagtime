@@ -67,32 +67,74 @@ export async function listPublicSlots(slug: string, from: Date, to: Date, output
   const bookingRangeEnd = DateTime.fromJSDate(to).plus({ minutes: effectiveBufferAfter + MAX_VALIDATED_BOOKING_BUFFER_MINUTES }).toJSDate();
   const [schedule, bookings, providerBusy] = await Promise.all([
     getAvailability(eventType.workspaceId, eventType.ownerId, eventType.owner.timeZone, { from, to }),
-    hostBusyIntervals(eventType.workspaceId, eventType.ownerId, bookingRangeStart, bookingRangeEnd, excludeBookingId),
+    hostBusyDetail(eventType.workspaceId, eventType.ownerId, bookingRangeStart, bookingRangeEnd, excludeBookingId),
     providerBusyRequest(),
   ]);
-  return generateSlots({
+  const capacity = Math.max(1, eventType.capacity ?? 1);
+  const ownGroupRows = capacity > 1 ? bookings.filter((row) => row.eventTypeId === eventType.id) : [];
+  const slots = generateSlots({
     eventType: { ...eventType, bookingWindowDays: bookingWindowDaysOverride ?? eventType.bookingWindowDays, durationId: duration.id, durationMinutes: durationMinutesOverride ?? duration.durationMinutes, bufferBeforeMinutes: effectiveBufferBefore, bufferAfterMinutes: effectiveBufferAfter, priceCents: duration.priceCents, currency: duration.currency },
     schedule,
     busy: [
-      ...bookings,
+      ...bookings.filter((row) => !ownGroupRows.includes(row)),
       ...providerBusy,
     ],
     from, to, outputTimeZone,
   });
+  return applyGroupCapacity(slots, ownGroupRows, capacity, effectiveBufferBefore, effectiveBufferAfter);
 }
 
-/** Times when the host is already booked (buffers included). In PostgreSQL production this goes through
- * tempocove_host_busy(), because the public booking context cannot read other clients' bookings. */
-async function hostBusyIntervals(workspaceId: string, hostId: string, from: Date, to: Date, excludeBookingId?: string) {
+export type HostBusyRow = { start: Date; end: Date; eventTypeId: string; startAt: Date };
+
+/** Group sessions: bookings of the same service at the same start share the time and use up places.
+ * Such a slot stays open until it is full; other starts that overlap the session stay blocked. */
+export function applyGroupCapacity<T extends { start: string; end: string }>(slots: T[], groupRows: HostBusyRow[], capacity: number, bufferBeforeMinutes: number, bufferAfterMinutes: number): Array<T & { capacity: number; seatsLeft: number }> {
+  if (capacity <= 1) return slots.map((slot) => ({ ...slot, capacity: 1, seatsLeft: 1 }));
+  const result: Array<T & { capacity: number; seatsLeft: number }> = [];
+  for (const slot of slots) {
+    const startMs = new Date(slot.start).getTime();
+    const occupiedStart = startMs - bufferBeforeMinutes * 60_000;
+    const occupiedEnd = new Date(slot.end).getTime() + bufferAfterMinutes * 60_000;
+    let taken = 0; let blocked = false;
+    for (const row of groupRows) {
+      if (row.startAt.getTime() === startMs) taken += 1;
+      else if (row.start.getTime() < occupiedEnd && row.end.getTime() > occupiedStart) { blocked = true; break; }
+    }
+    if (!blocked && taken < capacity) result.push({ ...slot, capacity, seatsLeft: capacity - taken });
+  }
+  return result;
+}
+
+/** Times when the host is already booked (buffers included), with the service and start of each booking.
+ * In PostgreSQL production this goes through tempocove_host_busy_detail(), because the public booking
+ * context cannot read other clients' bookings. */
+async function hostBusyDetail(workspaceId: string, hostId: string, from: Date, to: Date, excludeBookingId?: string): Promise<HostBusyRow[]> {
   if (process.env.DATABASE_PROVIDER === "postgresql" && process.env.NODE_ENV === "production") {
-    const rows = await db.$queryRaw<Array<{ busy_start: Date; busy_end: Date }>>`SELECT busy_start, busy_end FROM tempocove_host_busy(${workspaceId}, ${hostId}, ${from}::timestamp, ${to}::timestamp, ${excludeBookingId ?? null})`;
-    return rows.map((row) => ({ start: row.busy_start, end: row.busy_end }));
+    const rows = await db.$queryRaw<Array<{ busy_start: Date; busy_end: Date; event_type_id: string; start_at: Date }>>`SELECT busy_start, busy_end, event_type_id, start_at FROM tempocove_host_busy_detail(${workspaceId}, ${hostId}, ${from}::timestamp, ${to}::timestamp, ${excludeBookingId ?? null})`;
+    return rows.map((row) => ({ start: row.busy_start, end: row.busy_end, eventTypeId: row.event_type_id, startAt: row.start_at }));
   }
   const bookings = await db.booking.findMany({
     where: { id: excludeBookingId ? { not: excludeBookingId } : undefined, workspaceId, hostId, status: { in: activeStatuses }, startAt: { lt: to }, endAt: { gt: from } },
-    select: { startAt: true, endAt: true, bufferBeforeMinutes: true, bufferAfterMinutes: true },
+    select: { eventTypeId: true, startAt: true, endAt: true, bufferBeforeMinutes: true, bufferAfterMinutes: true },
   });
-  return bookings.map((item) => ({ start: DateTime.fromJSDate(item.startAt).minus({ minutes: item.bufferBeforeMinutes }).toJSDate(), end: DateTime.fromJSDate(item.endAt).plus({ minutes: item.bufferAfterMinutes }).toJSDate() }));
+  return bookings.map((item) => ({ start: DateTime.fromJSDate(item.startAt).minus({ minutes: item.bufferBeforeMinutes }).toJSDate(), end: DateTime.fromJSDate(item.endAt).plus({ minutes: item.bufferAfterMinutes }).toJSDate(), eventTypeId: item.eventTypeId, startAt: item.startAt }));
+}
+
+type SeatClient = Pick<typeof db, "$queryRaw" | "bookingOccupancy">;
+/** Lowest free place in a group session. One-to-one services always use place 0. */
+async function assignSeat(tx: SeatClient, workspaceId: string, eventTypeId: string, startAt: Date, capacity: number, excludeBookingId?: string) {
+  if (capacity <= 1) return 0;
+  let taken: number[];
+  if (process.env.DATABASE_PROVIDER === "postgresql" && process.env.NODE_ENV === "production") {
+    const rows = await tx.$queryRaw<Array<{ seat: number }>>`SELECT seat FROM tempocove_taken_seats(${workspaceId}, ${eventTypeId}, ${startAt}::timestamp, ${excludeBookingId ?? null}) AS seat`;
+    taken = rows.map((row) => Number(row.seat));
+  } else {
+    const rows = await tx.bookingOccupancy.findMany({ where: { workspaceId, bookingId: excludeBookingId ? { not: excludeBookingId } : undefined, booking: { eventTypeId, startAt, status: { in: activeStatuses } } }, select: { seat: true }, distinct: ["seat"] });
+    taken = rows.map((row) => row.seat);
+  }
+  const used = new Set(taken);
+  for (let seat = 0; seat < capacity; seat += 1) if (!used.has(seat)) return seat;
+  throw conflict("This time slot is fully booked.");
 }
 
 export function occupiedMinutes(start: Date, end: Date, beforeMinutes: number, afterMinutes: number) {
@@ -183,7 +225,8 @@ export async function createBooking(
         notificationStatus: duration.priceCents > 0 ? "LOCAL_NO_EMAIL" : "PENDING",
         answers: { create: eventType.questions.filter((item) => answerMap.has(item.id)).map((item) => ({ questionId: item.id, questionLabel: item.label, valueJson: JSON.stringify(answerMap.get(item.id)) })) },
       } });
-      await tx.bookingOccupancy.createMany({ data: occupiedMinutes(requestedStart, requestedEnd, eventType.bufferBeforeMinutes, eventType.bufferAfterMinutes).map((minuteStart) => ({ workspaceId: eventType.workspaceId, bookingId: booking.id, hostId: eventType.ownerId, minuteStart })) });
+      const seat = await assignSeat(tx, eventType.workspaceId, eventType.id, requestedStart, eventType.capacity ?? 1, booking.id);
+      await tx.bookingOccupancy.createMany({ data: occupiedMinutes(requestedStart, requestedEnd, eventType.bufferBeforeMinutes, eventType.bufferAfterMinutes).map((minuteStart) => ({ workspaceId: eventType.workspaceId, bookingId: booking.id, hostId: eventType.ownerId, minuteStart, seat })) });
       await tx.bookingCapability.createMany({ data: capabilityRows(booking.id, capability.version, capability.expiresAt, capability.keyId) });
       if (!duration.priceCents) {
         await tx.integrationOutbox.create({ data: { workspaceId: eventType.workspaceId, bookingId: booking.id, kind: "CALENDAR_CREATE", idempotencyKey: `calendar:create:${booking.id}:free` } });
@@ -276,7 +319,8 @@ export async function rescheduleBooking(id: string, startAt: string, calendar: C
       const won = await tx.booking.updateMany({ where: { id, mutationVersion: booking.mutationVersion, status: "CONFIRMED", OR: [{ calendarLeaseToken: null }, { calendarLeaseExpiresAt: { lte: mutationNow } }] }, data: { startAt: requestedStart, endAt: requestedEnd, manageExpiresAt: renewedManageExpiry, mutationVersion: { increment: 1 }, calendarLeaseToken: null, calendarLeaseExpiresAt: null, calendarSyncStatus: "PENDING", notificationStatus: "PENDING" } });
       if (won.count !== 1) throw conflict("The booking changed while rescheduling. Refresh and choose a new time.");
       await tx.bookingOccupancy.deleteMany({ where: { bookingId: id } });
-      await tx.bookingOccupancy.createMany({ data: occupiedMinutes(requestedStart, requestedEnd, booking.bufferBeforeMinutes, booking.bufferAfterMinutes).map((minuteStart) => ({ workspaceId: booking.workspaceId, bookingId: id, hostId: booking.hostId, minuteStart })) });
+      const seat = await assignSeat(tx, booking.workspaceId, booking.eventTypeId, requestedStart, booking.eventType.capacity ?? 1, id);
+      await tx.bookingOccupancy.createMany({ data: occupiedMinutes(requestedStart, requestedEnd, booking.bufferBeforeMinutes, booking.bufferAfterMinutes).map((minuteStart) => ({ workspaceId: booking.workspaceId, bookingId: id, hostId: booking.hostId, minuteStart, seat })) });
       await tx.bookingManageSession.updateMany({ where: { bookingId: id, revokedAt: null }, data: { expiresAt: renewedManageExpiry } });
       await tx.integrationOutbox.create({ data: { workspaceId: booking.workspaceId, bookingId: id, kind: "CALENDAR_UPDATE", bookingMutationVersion: booking.mutationVersion + 1, idempotencyKey: `calendar:update:${id}:${requestedStart.toISOString()}` } });
       const result = await tx.booking.findUniqueOrThrow({ where: { id }, include: bookingInclude });
