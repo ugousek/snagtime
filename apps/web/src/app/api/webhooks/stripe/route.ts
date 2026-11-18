@@ -2,8 +2,9 @@ import { AppError } from "@/server/errors";
 import { apiError, ok, readBoundedText } from "@/server/http";
 import { processStripeWebhook } from "@/server/services/payments";
 import { clientAddress, enforceRateLimit } from "@/server/rate-limit";
+import { withDatabaseScope } from "@/server/db-context";
 
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   try {
     await enforceRateLimit(`stripe-webhook:${clientAddress(request)}`, 120, 60_000);
     const signature = request.headers.get("stripe-signature");
@@ -12,3 +13,5 @@ export async function POST(request: Request) {
     return ok(await processStripeWebhook(raw, signature));
   } catch (error) { return apiError(error); }
 }
+
+export const POST = withDatabaseScope(POSTHandler);

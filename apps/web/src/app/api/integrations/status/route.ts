@@ -2,8 +2,9 @@ import { requireWorkspaceAccess } from "@/server/auth/session";
 import { apiError, ok } from "@/server/http";
 import { googleCalendarStatus } from "@/server/services/calendar";
 import { stripeTestConfigurationReady } from "@/server/stripe-credentials";
+import { withDatabaseScope } from "@/server/db-context";
 
-export async function GET(request: Request) {
+async function GETHandler(request: Request) {
   try {
     const access = await requireWorkspaceAccess(request);
     return ok({
@@ -13,3 +14,5 @@ export async function GET(request: Request) {
     });
   } catch (error) { return apiError(error); }
 }
+
+export const GET = withDatabaseScope(GETHandler);

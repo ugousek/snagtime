@@ -8,6 +8,8 @@ const roles = [
   ["tempocove_worker_login", "TEMPOCOVE_WORKER_DB_PASSWORD"],
   ["tempocove_monitor_login", "TEMPOCOVE_MONITOR_DB_PASSWORD"],
   ["tempocove_migration_login", "TEMPOCOVE_MIGRATION_DB_PASSWORD"],
+  // Optional: the SaaS operator console login. Provisioned only when its password is supplied.
+  ...(process.env.TEMPOCOVE_PLATFORM_DB_PASSWORD ? [["tempocove_platform_login", "TEMPOCOVE_PLATFORM_DB_PASSWORD"]] : []),
 ];
 
 try {
@@ -24,5 +26,5 @@ try {
     await db.$executeRawUnsafe(`ALTER ROLE ${role} LOGIN PASSWORD ${literal}`);
   }
   await db.$executeRawUnsafe("INSERT INTO tempocove_context_authority(singleton,secret) VALUES (true,$1) ON CONFLICT (singleton) DO UPDATE SET secret=EXCLUDED.secret,installed_at=clock_timestamp()",contextSecret);
-  console.log("PostgreSQL migration, app, worker, and monitor logins plus tenant context were provisioned without printing credentials.");
+  console.log("PostgreSQL migration, app, worker, monitor (and platform) logins plus tenant context were provisioned without printing credentials.");
 } finally { await db.$disconnect(); }

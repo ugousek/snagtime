@@ -35,7 +35,7 @@ describe("POC rate limiting", () => {
   it("rejects public event reads before resolving a slug after the coarse IP budget",async()=>{
     for(let index=0;index<120;index+=1)await enforceRateLimit("public-event:ip:anonymous-local",120,60_000);
     const response=await getPublicEvent(new Request("http://localhost:3000/api/public/not-resolved"),{params:Promise.resolve({slug:"not-resolved"})});
-    expect(response.status).toBe(429);expect(await response.json()).toEqual({error:{code:"RATE_LIMITED",message:"Too many requests. Try again shortly."}});
+    expect(response.status).toBe(429);expect(await response.json()).toEqual({error:{code:"RATE_LIMITED",message:"Příliš mnoho pokusů. Zkuste to prosím za chvíli."}});
   });
   it("shares one coarse IP budget across invalid manage detail and slot authorization",async()=>{
     for(let index=0;index<240;index+=1)await enforceRateLimit("manage-attempt:ip:anonymous-local",240,60_000);

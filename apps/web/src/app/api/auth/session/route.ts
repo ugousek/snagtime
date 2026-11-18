@@ -7,15 +7,16 @@ import { AppError } from "@/server/errors";
 import { verifyPassword } from "@/server/auth/password";
 import { clientAddress, enforceRateLimit } from "@/server/rate-limit";
 import { enterAuthDatabaseContext } from "@/server/db-context";
+import { withDatabaseScope } from "@/server/db-context";
 
 function loginRoleRank(role: string) { return role === "OWNER" ? 3 : role === "ADMIN" ? 2 : 1; }
 const DUMMY_LOGIN_HASH = `scrypt:v1:${Buffer.alloc(16).toString("base64url")}:${Buffer.alloc(32).toString("base64url")}`;
 
-export async function GET(request: Request) {
+async function GETHandler(request: Request) {
   try { const session = await getSessionRecord(request); return ok({ user: session ? mapUser(session.user) : null, workspace: session ? { id: session.workspace.id, name: session.workspace.name, timeZone: session.workspace.timeZone, role: session.membership.role, onboardingCompleted: Boolean(session.workspace.onboardingCompletedAt) } : null }); } catch (error) { return apiError(error); }
 }
 
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   try {
     assertSameOrigin(request);
     const { email, password } = demoLoginInput.parse(await jsonBody(request));
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
   } catch (error) { return apiError(error); }
 }
 
-export async function DELETE(request: Request) {
+async function DELETEHandler(request: Request) {
   try {
     assertSameOrigin(request);
     await revokeRequestSession(request);
@@ -41,3 +42,7 @@ export async function DELETE(request: Request) {
     return response;
   } catch (error) { return apiError(error); }
 }
+
+export const GET = withDatabaseScope(GETHandler);
+export const POST = withDatabaseScope(POSTHandler);
+export const DELETE = withDatabaseScope(DELETEHandler);

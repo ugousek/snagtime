@@ -19,6 +19,7 @@ const eventTypeObject = z.object({
   bufferAfterMinutes: z.number().int().min(0).max(240),
   minimumNoticeMinutes: z.number().int().min(0).max(10080),
   bookingWindowDays: z.number().int().min(1).max(365),
+  capacity: z.number().int().min(1).max(500).optional(),
   priceCents: z.number().int().min(0).max(10_000_000),
   currency: z.string().trim().toLowerCase().regex(/^[a-z]{3}$/),
   durations: z.array(z.object({

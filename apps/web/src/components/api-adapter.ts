@@ -19,6 +19,7 @@ export function mapEventType(item: EventTypeSummary): EventType {
     durations: (item.durations.length ? item.durations : [{ id: "default", label: `${item.durationMinutes} min`, durationMinutes: item.durationMinutes, isDefault: true, priceCents: item.priceCents, currency: item.currency, position: 0 }]).map((duration) => ({ id: duration.id, minutes: duration.durationMinutes, label: duration.label, isDefault: duration.isDefault, price: duration.priceCents > 0 ? duration.priceCents / 100 : undefined, currency: duration.currency })),
     questions: item.questions.map((question) => ({ id: question.id, label: question.label, kind: question.kind, required: question.required, options: question.options })),
     bookingWindowDays: item.bookingWindowDays,
+    capacity: item.capacity ?? 1,
     bufferBeforeMinutes: item.bufferBeforeMinutes,
     bufferAfterMinutes: item.bufferAfterMinutes,
     minimumNoticeMinutes: item.minimumNoticeMinutes,
@@ -44,6 +45,7 @@ export function toEventInput(event: EventType): CreateEventTypeInput {
     bufferAfterMinutes: event.bufferAfterMinutes,
     minimumNoticeMinutes: event.minimumNoticeMinutes,
     bookingWindowDays: event.bookingWindowDays,
+    capacity: Math.min(500, Math.max(1, Math.round(event.capacity || 1))),
     priceCents: primary.price ? Math.round(primary.price * 100) : 0,
     currency: primary.currency ?? "USD",
     durations: event.durations.map((duration, position) => ({ ...(duration.id ? { id: duration.id } : {}), label: duration.label, durationMinutes: duration.minutes, isDefault: duration.isDefault, priceCents: duration.price ? Math.round(duration.price * 100) : 0, currency: duration.currency ?? "USD", position })),
@@ -54,21 +56,19 @@ export function toEventInput(event: EventType): CreateEventTypeInput {
 function minutesToTime(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  const suffix = hours >= 12 ? "PM" : "AM";
-  const display = hours % 12 || 12;
-  return `${display}:${mins.toString().padStart(2, "0")} ${suffix}`;
+  return `${hours}:${mins.toString().padStart(2, "0")}`;
 }
 
 function timeToMinutes(value: string) {
-  const match = value.match(/(\d+):(\d+)\s(AM|PM)/);
+  const match = value.match(/(\d+):(\d+)(?:\s(AM|PM))?/);
   if (!match) return 540;
-  let hour = Number(match[1]) % 12;
-  if (match[3] === "PM") hour += 12;
+  let hour = Number(match[1]);
+  if (match[3]) { hour %= 12; if (match[3] === "PM") hour += 12; }
   return hour * 60 + Number(match[2]);
 }
 
 export function mapAvailability(schedule: AvailabilitySchedule): AvailabilityDay[] {
-  const names: ReadonlyArray<readonly [string, string]> = [["Sunday", "Sun"], ["Monday", "Mon"], ["Tuesday", "Tue"], ["Wednesday", "Wed"], ["Thursday", "Thu"], ["Friday", "Fri"], ["Saturday", "Sat"]];
+  const names: ReadonlyArray<readonly [string, string]> = [["Neděle", "Ne"], ["Pondělí", "Po"], ["Úterý", "Út"], ["Středa", "St"], ["Čtvrtek", "Čt"], ["Pátek", "Pá"], ["Sobota", "So"]];
   return names.slice(1).concat(names.slice(0, 1)).map(([day, short], index) => {
     const apiDay = index === 6 ? 0 : index + 1;
     const windows = schedule.intervals.filter((interval) => interval.dayOfWeek === apiDay).map((interval) => ({ id: interval.id ?? `${apiDay}-${interval.startMinute}`, start: minutesToTime(interval.startMinute), end: minutesToTime(interval.endMinute) }));
@@ -95,8 +95,8 @@ export function mapBooking(item: BookingSummary, organizerTimeZone = item.invite
     email: item.inviteeEmail,
     eventTitle: item.eventTitleSnapshot,
     startsAt: item.startAt,
-    dateLabel: start.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: organizerTimeZone }),
-    timeLabel: `${start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: organizerTimeZone })} – ${end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: organizerTimeZone })}`,
+    dateLabel: start.toLocaleDateString("cs-CZ", { month: "short", day: "numeric", timeZone: organizerTimeZone }),
+    timeLabel: `${start.toLocaleTimeString("cs-CZ", { hour: "numeric", minute: "2-digit", timeZone: organizerTimeZone })} – ${end.toLocaleTimeString("cs-CZ", { hour: "numeric", minute: "2-digit", timeZone: organizerTimeZone })}`,
     duration: Math.round((end.getTime() - start.getTime()) / 60000),
     timezone: item.inviteeTimeZone,
     organizerTimeZone,

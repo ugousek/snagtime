@@ -1,0 +1,139 @@
+# Self-hosted single-server deployment: PostgreSQL + web + worker + Caddy (automatic HTTPS).
+# Do not run directly; use ./deploy/setup.sh, which generates secrets and certificates first.
+name: rezervace
+
+x-app-env: &app-env
+  NODE_ENV: production
+  DATABASE_PROVIDER: postgresql
+  NEXT_PUBLIC_APP_URL: https://${APP_DOMAIN:?set APP_DOMAIN in deploy/.env}/
+  BUILD_ID: ${BUILD_ID:?run via deploy/setup.sh}
+  TOKEN_ENCRYPTION_KEY_FILE: /run/secrets/token_encryption_key
+  EMAIL_TOKEN_SECRET_FILE: /run/secrets/email_token_secret
+  OUTBOX_WORKER_MODE: dedicated
+  OUTBOX_WORKER_ENABLED: "false"
+  DEMO_MODE: "false"
+  EMAIL_PROVIDER: smtp
+  CALENDAR_PROVIDER: ${CALENDAR_PROVIDER:-local}
+  PAYMENTS_PROVIDER: ${PAYMENTS_PROVIDER:-none}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
+  STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
+  SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST}
+  SMTP_PORT: ${SMTP_PORT:?set SMTP_PORT}
+  SMTP_TLS_MODE: ${SMTP_TLS_MODE:?set implicit or starttls}
+  SMTP_USER: ${SMTP_USER:?set SMTP_USER}
+  SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+  EMAIL_FROM: ${EMAIL_FROM:?set EMAIL_FROM}
+  EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:?set EMAIL_REPLY_TO}
+  EMAIL_SENDER_DOMAIN: ${EMAIL_SENDER_DOMAIN:?set EMAIL_SENDER_DOMAIN}
+
+x-hardening: &hardening
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+
+services:
+  postgres:
+    build: { context: .., dockerfile: infrastructure/postgresql/Dockerfile }
+    environment:
+      POSTGRES_USER: tempocove_owner
+      POSTGRES_DB: tempocove
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_owner_password
+    secrets: [postgres_owner_password, postgres_server_cert, postgres_server_key, postgres_ca_cert]
+    volumes: [postgres_data:/var/lib/postgresql/18/docker]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U tempocove_owner -d tempocove"], interval: 5s, timeout: 5s, retries: 24 }
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+
+  migration:
+    build: { context: .., target: migration }
+    profiles: [migration]
+    environment:
+      DATABASE_URL_FILE: /run/secrets/migration_database_url
+    secrets: [migration_database_url, postgres_ca_cert]
+    depends_on: { postgres: { condition: service_healthy } }
+    <<: *hardening
+
+  web:
+    build: { context: .., target: runtime, args: { BUILD_ID: "${BUILD_ID:?run via deploy/setup.sh}" } }
+    image: rezervace-runtime:${BUILD_ID}
+    command: ["node", "apps/web/server.js"]
+    environment:
+      <<: *app-env
+      DATABASE_URL_FILE: /run/secrets/app_database_url
+      DATABASE_ROLE: app
+      AUTH_SECRET_FILE: /run/secrets/auth_secret
+      BOOKING_CAPABILITY_KEY_ID: k1
+      BOOKING_CAPABILITY_SECRET_FILE: /run/secrets/booking_capability_secret
+      BOOKING_CAPABILITY_KEYRING_FILE: /run/secrets/booking_capability_keyring
+      TENANT_CONTEXT_SECRET_FILE: /run/secrets/tenant_context_secret
+      RATE_LIMIT_HASH_SECRET_FILE: /run/secrets/rate_limit_hash_secret
+      PROXY_SHARED_SECRET_FILE: /run/secrets/proxy_shared_secret
+      OPERATOR_HEALTH_SECRET_FILE: /run/secrets/operator_health_secret
+      STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/stripe_webhook_secret
+      RATE_LIMIT_PROVIDER: postgresql
+      RATE_LIMIT_MAX_BUCKETS: "100000"
+      TRUST_PROXY: "true"
+      PLATFORM_DATABASE_URL_FILE: /run/secrets/platform_database_url
+      PLATFORM_ADMIN_EMAILS: ${PLATFORM_ADMIN_EMAILS:-}
+      PLATFORM_CONTACT_EMAIL: ${PLATFORM_CONTACT_EMAIL:-}
+    secrets: [platform_database_url, app_database_url, postgres_ca_cert, auth_secret, booking_capability_secret, booking_capability_keyring, token_encryption_key, email_token_secret, tenant_context_secret, rate_limit_hash_secret, proxy_shared_secret, operator_health_secret, google_client_secret, stripe_secret_key, stripe_webhook_secret, smtp_password]
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: unless-stopped
+    expose: ["3000"]
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 15s, timeout: 4s, retries: 6 }
+    <<: *hardening
+
+  worker:
+    image: rezervace-runtime:${BUILD_ID}
+    command: ["node", "dist/worker.mjs"]
+    environment:
+      <<: *app-env
+      DATABASE_ROLE: worker
+      WORKER_DATABASE_URL_FILE: /run/secrets/worker_database_url
+    secrets: [worker_database_url, postgres_ca_cert, token_encryption_key, email_token_secret, google_client_secret, stripe_secret_key, smtp_password]
+    depends_on: { postgres: { condition: service_healthy }, web: { condition: service_started } }
+    restart: unless-stopped
+    <<: *hardening
+
+  caddy:
+    image: caddy:2.10.2
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+    env_file: [./secrets/caddy.env]
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes: [./Caddyfile:/etc/caddy/Caddyfile:ro, caddy_data:/data, caddy_config:/config]
+    depends_on: [web]
+    restart: unless-stopped
+
+secrets:
+  postgres_owner_password: { file: ./secrets/postgres_owner_password }
+  postgres_server_cert: { file: ./secrets/postgres_server_cert }
+  postgres_server_key: { file: ./secrets/postgres_server_key }
+  postgres_ca_cert: { file: ./secrets/postgres_ca_cert }
+  migration_database_url: { file: ./secrets/migration_database_url }
+  app_database_url: { file: ./secrets/app_database_url }
+  platform_database_url: { file: ./secrets/platform_database_url }
+  worker_database_url: { file: ./secrets/worker_database_url }
+  auth_secret: { file: ./secrets/auth_secret }
+  booking_capability_secret: { file: ./secrets/booking_capability_secret }
+  booking_capability_keyring: { file: ./secrets/booking_capability_keyring }
+  token_encryption_key: { file: ./secrets/token_encryption_key }
+  email_token_secret: { file: ./secrets/email_token_secret }
+  tenant_context_secret: { file: ./secrets/tenant_context_secret }
+  rate_limit_hash_secret: { file: ./secrets/rate_limit_hash_secret }
+  proxy_shared_secret: { file: ./secrets/proxy_shared_secret }
+  operator_health_secret: { file: ./secrets/operator_health_secret }
+  google_client_secret: { file: ./secrets/google_client_secret }
+  stripe_secret_key: { file: ./secrets/stripe_secret_key }
+  stripe_webhook_secret: { file: ./secrets/stripe_webhook_secret }
+  smtp_password: { file: ./secrets/smtp_password }
+
+volumes:
+  postgres_data: {}
+  caddy_data: {}
+  caddy_config: {}

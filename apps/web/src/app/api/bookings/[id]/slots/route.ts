@@ -5,10 +5,11 @@ import { apiError, ok } from "@/server/http";
 import { AppError } from "@/server/errors";
 import { clientAddress, enforceRateLimit } from "@/server/rate-limit";
 import { getBookingForHost, listManageRescheduleSlots } from "@/server/services/bookings";
+import { withDatabaseScope } from "@/server/db-context";
 
 type Context = { params: Promise<{ id: string }> };
 
-export async function GET(request: Request, context: Context) {
+async function GETHandler(request: Request, context: Context) {
   try {
     await enforceRateLimit(`manage-attempt:ip:${clientAddress(request)}`,240,60_000);
     const { id } = await context.params;
@@ -23,3 +24,5 @@ export async function GET(request: Request, context: Context) {
     return ok(await listManageRescheduleSlots(id, from.toJSDate(), to.toJSDate(), timeZone, url.searchParams.get("durationId") || undefined));
   } catch (error) { return apiError(error); }
 }
+
+export const GET = withDatabaseScope(GETHandler);

@@ -24,15 +24,15 @@ function GenericRequestForm({ kind }: { kind: "password" | "verification" }) {
       if (kind === "password") await frontendApi.requestPasswordReset(email.trim());
       else await frontendApi.requestEmailVerification(email.trim());
       setAccepted(true);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "The request could not be accepted."); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Požadavek nebylo možné přijmout."); }
     finally { setWorking(false); }
   };
-  if (accepted) return <div className="recovery-result" role="status" aria-live="polite"><strong>Request accepted</strong><p>If the address is eligible, SnagTime will make instructions available through its configured email provider. This page does not confirm an account or delivery.</p><Link className="button button-primary" href="/dashboard">Return to sign in</Link></div>;
-  return <form onSubmit={submit}><label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>{error && <div className="form-error" role="alert" aria-live="assertive">{error}</div>}<button className="button button-primary" type="submit" disabled={working || !email.includes("@")}>{working ? "Submitting…" : kind === "password" ? "Request reset instructions" : "Request verification instructions"}</button></form>;
+  if (accepted) return <div className="recovery-result" role="status" aria-live="polite"><strong>Požadavek přijat</strong><p>Pokud je adresa oprávněná, pošleme pokyny přes nastaveného e-mailového poskytovatele. Tato stránka nepotvrzuje existenci účtu ani doručení.</p><Link className="button button-primary" href="/dashboard">Zpět na přihlášení</Link></div>;
+  return <form onSubmit={submit}><label>E-mailová adresa<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>{error && <div className="form-error" role="alert" aria-live="assertive">{error}</div>}<button className="button button-primary" type="submit" disabled={working || !email.includes("@")}>{working ? "Odesílám…" : kind === "password" ? "Vyžádat pokyny k obnovení" : "Vyžádat pokyny k ověření"}</button></form>;
 }
 
 export function ForgotPasswordView() {
-  return <AccessFrame eyebrow="Account recovery" title="Reset your password" description="Submit your email address. The response is identical whether or not an eligible account exists."><GenericRequestForm kind="password" /><p className="auth-switch"><Link href="/dashboard">Back to sign in</Link></p></AccessFrame>;
+  return <AccessFrame eyebrow="Obnovení účtu" title="Obnovte si heslo" description="Zadejte e-mailovou adresu. Odpověď je stejná bez ohledu na to, zda účet existuje."><GenericRequestForm kind="password" /><p className="auth-switch"><Link href="/dashboard">Zpět na přihlášení</Link></p></AccessFrame>;
 }
 
 export function ResetPasswordView() {
@@ -47,7 +47,7 @@ export function ResetPasswordView() {
     const claim = () => {
       const claimed = claimOneUseLinkAuthority("token");
       setAuthority(claimed);
-      setError(claimed ? "" : "This password reset link is incomplete.");
+      setError(claimed ? "" : "Odkaz pro obnovení hesla je neúplný.");
       setPassword(""); setReset(false); setReady(true);
     };
     if (!started.current) { started.current = true; claim(); }
@@ -56,15 +56,15 @@ export function ResetPasswordView() {
   }, []);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!authority || !strongPassword(password)) { setError("Use a complete reset link and a password that meets every requirement."); return; }
+    if (!authority || !strongPassword(password)) { setError("Použijte úplný odkaz pro obnovení a heslo splňující všechny požadavky."); return; }
     setWorking(true); setError("");
     try { await shareOneUseAction("password-reset", authority, () => frontendApi.resetPassword(authority, password)); setPassword(""); setReset(true); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "This link is invalid or expired."); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Odkaz je neplatný nebo vypršel."); }
     finally { setWorking(false); }
   };
-  if (!ready) return <AccessFrame eyebrow="Account recovery" title="Preparing password reset" description="Removing the one-time authority from the browser address."><div className="sync-note" role="status"><span className="spinner" />Preparing…</div></AccessFrame>;
-  if (reset) return <AccessFrame eyebrow="Password reset" title="Password updated" description="Your password was reset and previous sessions were revoked. Sign in again with the new password."><Link className="button button-primary" href="/dashboard">Sign in</Link></AccessFrame>;
-  return <AccessFrame eyebrow="Account recovery" title="Choose a new password" description="The one-time authority was removed from the browser address before this form was shown."><form onSubmit={submit}><label>New password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={12} maxLength={200} aria-describedby="reset-password-rules" required /></label><p className="password-rules" id="reset-password-rules">Use at least 12 characters with uppercase, lowercase, a number, and a symbol.</p>{error && <div className="form-error" role="alert" aria-live="assertive">{error}</div>}<button className="button button-primary" type="submit" disabled={working || !authority || !strongPassword(password)}>{working ? "Resetting…" : "Reset password"}</button></form><p className="auth-switch"><Link href="/forgot-password">Request another link</Link></p></AccessFrame>;
+  if (!ready) return <AccessFrame eyebrow="Obnovení účtu" title="Připravuji obnovení hesla" description="Odstraňuji jednorázový klíč z adresy v prohlížeči."><div className="sync-note" role="status"><span className="spinner" />Připravuji…</div></AccessFrame>;
+  if (reset) return <AccessFrame eyebrow="Obnovení hesla" title="Heslo změněno" description="Heslo bylo obnoveno a předchozí relace zrušeny. Přihlaste se novým heslem."><Link className="button button-primary" href="/dashboard">Přihlásit se</Link></AccessFrame>;
+  return <AccessFrame eyebrow="Obnovení účtu" title="Zvolte nové heslo" description="Jednorázový klíč byl před zobrazením formuláře odstraněn z adresy v prohlížeči."><form onSubmit={submit}><label>Nové heslo<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" minLength={12} maxLength={200} aria-describedby="reset-password-rules" required /></label><p className="password-rules" id="reset-password-rules">Použijte alespoň 12 znaků, velké i malé písmeno, číslici a symbol.</p>{error && <div className="form-error" role="alert" aria-live="assertive">{error}</div>}<button className="button button-primary" type="submit" disabled={working || !authority || !strongPassword(password)}>{working ? "Obnovuji…" : "Obnovit heslo"}</button></form><p className="auth-switch"><Link href="/forgot-password">Vyžádat nový odkaz</Link></p></AccessFrame>;
 }
 
 export function VerifyEmailView() {
@@ -76,16 +76,16 @@ export function VerifyEmailView() {
       const authority = claimOneUseLinkAuthority("token");
       if (!authority) { queueMicrotask(() => setStatus("idle")); return; }
       queueMicrotask(() => { setError(""); setStatus("working"); });
-      void shareOneUseAction("email-verification", authority, () => frontendApi.verifyEmail(authority)).then(() => setStatus("verified")).catch((reason) => { setError(reason instanceof Error ? reason.message : "This link is invalid or expired."); setStatus("error"); });
+      void shareOneUseAction("email-verification", authority, () => frontendApi.verifyEmail(authority)).then(() => setStatus("verified")).catch((reason) => { setError(reason instanceof Error ? reason.message : "Odkaz je neplatný nebo vypršel."); setStatus("error"); });
     };
     if (!started.current) { started.current = true; verify(); }
     window.addEventListener("hashchange", verify);
     return () => window.removeEventListener("hashchange", verify);
   }, []);
-  if (status === "booting" || status === "working") return <AccessFrame eyebrow="Email verification" title="Verifying your email" description="The one-time authority is removed from the browser address before verification begins."><div className="sync-note" role="status"><span className="spinner" />Verifying…</div></AccessFrame>;
-  if (status === "idle") return <AccessFrame eyebrow="Email verification" title="Request verification instructions" description="Submit your address. The response does not disclose whether an account exists or requires verification."><GenericRequestForm kind="verification" /><p className="auth-switch"><Link href="/dashboard">Back to sign in</Link></p></AccessFrame>;
-  if (status === "verified") return <AccessFrame eyebrow="Email verified" title="Your email is verified" description="You can now sign in to the workspace created for this address."><Link className="button button-primary" href="/dashboard">Sign in</Link></AccessFrame>;
-  return <AccessFrame eyebrow="Unable to verify" title="This link cannot be used" description="Verification links are one-time and expire."><div className="form-error" role="alert">{error}</div><Link className="button button-secondary" href="/verify-email">Request another link</Link></AccessFrame>;
+  if (status === "booting" || status === "working") return <AccessFrame eyebrow="Ověření e-mailu" title="Ověřuji váš e-mail" description="Jednorázový klíč se před ověřením odstraní z adresy v prohlížeči."><div className="sync-note" role="status"><span className="spinner" />Ověřuji…</div></AccessFrame>;
+  if (status === "idle") return <AccessFrame eyebrow="Ověření e-mailu" title="Vyžádat pokyny k ověření" description="Zadejte adresu. Odpověď neprozrazuje, zda účet existuje nebo vyžaduje ověření."><GenericRequestForm kind="verification" /><p className="auth-switch"><Link href="/dashboard">Zpět na přihlášení</Link></p></AccessFrame>;
+  if (status === "verified") return <AccessFrame eyebrow="E-mail ověřen" title="Váš e-mail je ověřený" description="Nyní se můžete přihlásit do provozovny vytvořené pro tuto adresu."><Link className="button button-primary" href="/dashboard">Přihlásit se</Link></AccessFrame>;
+  return <AccessFrame eyebrow="Nelze ověřit" title="Tento odkaz nelze použít" description="Ověřovací odkazy jsou jednorázové a mají omezenou platnost."><div className="form-error" role="alert">{error}</div><Link className="button button-secondary" href="/verify-email">Vyžádat nový odkaz</Link></AccessFrame>;
 }
 
 export function AcceptInvitationView() {
@@ -101,13 +101,13 @@ export function AcceptInvitationView() {
     try { await shareOneUseAction("workspace-invitation", authority.current, () => frontendApi.acceptWorkspaceInvitation(authority.current)); setStatus("accepted"); }
     catch (reason) {
       if (reason instanceof SnagTimeApiError && reason.status === 401) { setStatus("login"); return; }
-      setError(reason instanceof Error ? reason.message : "This invitation is invalid or expired."); setStatus("error");
+      setError(reason instanceof Error ? reason.message : "Tato pozvánka je neplatná nebo vypršela."); setStatus("error");
     }
   }, []);
   useEffect(() => {
     const claim = () => {
       authority.current = claimOneUseLinkAuthority("token");
-      if (!authority.current) { setError("This invitation link is incomplete."); setStatus("error"); return; }
+      if (!authority.current) { setError("Odkaz s pozvánkou je neúplný."); setStatus("error"); return; }
       void accept();
     };
     if (!started.current) { started.current = true; claim(); }
@@ -117,10 +117,10 @@ export function AcceptInvitationView() {
   const login = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setError("");
     try { await frontendApi.login(email, password); setPassword(""); await accept(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "Sign in failed."); setStatus("login"); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Přihlášení se nezdařilo."); setStatus("login"); }
   };
-  if (status === "working") return <AccessFrame eyebrow="Workspace invitation" title="Checking your invitation" description="The one-time authority has been removed from the browser address."><div className="sync-note" role="status"><span className="spinner" />Checking…</div></AccessFrame>;
-  if (status === "accepted") return <AccessFrame eyebrow="Invitation accepted" title="You’re in" description="This workspace is now available from your account."><Link className="button button-primary" href="/dashboard">Open SnagTime</Link></AccessFrame>;
-  if (status === "login") return <AccessFrame eyebrow="Workspace invitation" title="Sign in to continue" description="Use the verified account matching the invitation. The authority remains only in this page’s memory."><form onSubmit={login}><label>Email address<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" required /></label><label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>{error && <div className="form-error" role="alert">{error}</div>}<button className="button button-primary" type="submit">Sign in and accept</button></form></AccessFrame>;
-  return <AccessFrame eyebrow="Unable to accept" title="This invitation cannot be used" description="Invitation links are bound to a verified account, single-use, and expire."><div className="form-error" role="alert">{error}</div><Link className="button button-secondary" href="/dashboard">Go to sign in</Link></AccessFrame>;
+  if (status === "working") return <AccessFrame eyebrow="Pozvánka do provozovny" title="Kontroluji pozvánku" description="Jednorázový klíč byl odstraněn z adresy v prohlížeči."><div className="sync-note" role="status"><span className="spinner" />Kontroluji…</div></AccessFrame>;
+  if (status === "accepted") return <AccessFrame eyebrow="Pozvánka přijata" title="Jste tam" description="Tato provozovna je teď dostupná z vašeho účtu."><Link className="button button-primary" href="/dashboard">Otevřít aplikaci</Link></AccessFrame>;
+  if (status === "login") return <AccessFrame eyebrow="Pozvánka do provozovny" title="Pro pokračování se přihlaste" description="Použijte ověřený účet, pro který je pozvánka určená. Klíč zůstává jen v paměti této stránky."><form onSubmit={login}><label>E-mailová adresa<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" required /></label><label>Heslo<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>{error && <div className="form-error" role="alert">{error}</div>}<button className="button button-primary" type="submit">Přihlásit a přijmout</button></form></AccessFrame>;
+  return <AccessFrame eyebrow="Nelze přijmout" title="Tuto pozvánku nelze použít" description="Pozvánky jsou vázané na ověřený účet, jednorázové a mají omezenou platnost."><div className="form-error" role="alert">{error}</div><Link className="button button-secondary" href="/dashboard">Přejít na přihlášení</Link></AccessFrame>;
 }

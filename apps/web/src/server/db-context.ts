@@ -4,6 +4,14 @@ import { createHmac } from "node:crypto";
 export type DatabaseContext = { mode: "auth" | "bootstrap" | "session" | "workspace" | "public" | "capability" | "provider"; workspaceId?: string; userId?: string; sessionHash?: string; subject?: string; action?: string };
 type StoredContext = DatabaseContext & { transaction?: Record<string, unknown> };
 export const databaseContext = new AsyncLocalStorage<StoredContext>();
+// Request-scoped, mutable holder. AsyncLocalStorage.enterWith() inside an awaited helper (for example
+// getSessionRecord) does not propagate back to the calling route handler, so the context a helper
+// establishes would be lost after `await`. Route handlers run inside withDatabaseScope(), and helpers
+// write into this shared holder instead.
+const requestScope = new AsyncLocalStorage<{ context?: StoredContext }>();
+export function withDatabaseScope<Args extends unknown[], Result>(handler: (...args: Args) => Promise<Result>) {
+  return (...args: Args) => requestScope.run({}, () => handler(...args));
+}
 
 function contextSecret() {
   const secret = process.env.TENANT_CONTEXT_SECRET || "";
@@ -15,7 +23,10 @@ export function contextSignature(context: DatabaseContext) {
   return createHmac("sha256", contextSecret()).update(["v2",context.mode,field(context.workspaceId),field(context.userId),field(context.sessionHash),field(context.subject),field(context.action)].join("\0")).digest("hex");
 }
 export function enterDatabaseContext(context: DatabaseContext) {
-  if (process.env.DATABASE_PROVIDER === "postgresql" && process.env.NODE_ENV === "production") databaseContext.enterWith(context);
+  if (process.env.DATABASE_PROVIDER !== "postgresql" || process.env.NODE_ENV !== "production") return;
+  const holder = requestScope.getStore();
+  if (holder && !databaseContext.getStore()) holder.context = context;
+  else databaseContext.enterWith(context);
 }
 export function enterAuthDatabaseContext(subject: string, userId?: string, workspaceId?: string, action = "auth") { enterDatabaseContext({ mode: "auth", subject: subject.toLowerCase(), userId, workspaceId,action }); }
 export function enterBootstrapDatabaseContext(email: string, userId?: string, workspaceId?: string) { enterDatabaseContext({ mode: "bootstrap", workspaceId, userId, subject: [email.toLowerCase(),userId||"",workspaceId||""].join("|"),action:"register" }); }
@@ -24,10 +35,10 @@ export function enterPublicBookingDatabaseContext(eventTypeId: string, workspace
 export function enterCapabilityDatabaseContext(subject: string, userId?: string, workspaceId?: string, action = "capability") { enterDatabaseContext({ mode: "capability", subject, userId, workspaceId,action }); }
 export function enterProviderDatabaseContext(subject: string, workspaceId?: string, action = "provider_commit") { enterDatabaseContext({ mode: "provider", subject, workspaceId,action }); }
 export function enterDatabaseAction(action:string){
-  const current=databaseContext.getStore();
+  const current=currentDatabaseContext();
   if(current)enterDatabaseContext({mode:current.mode,workspaceId:current.workspaceId,userId:current.userId,sessionHash:current.sessionHash,subject:current.subject,action});
 }
-export function currentDatabaseContext() { return databaseContext.getStore(); }
+export function currentDatabaseContext() { return databaseContext.getStore() ?? requestScope.getStore()?.context; }
 export async function installDatabaseContext(transaction: Record<string, unknown>, context: DatabaseContext) {
   const execute = transaction.$executeRawUnsafe as (query: string, ...values: unknown[]) => Promise<unknown>;
   await execute.call(transaction, "SELECT set_config('tempocove.mode',$1,true),set_config('tempocove.workspace_id',$2,true),set_config('tempocove.user_id',$3,true),set_config('tempocove.session_hash',$4,true),set_config('tempocove.subject',$5,true),set_config('tempocove.action',$6,true),set_config('tempocove.signature',$7,true)", context.mode, field(context.workspaceId), field(context.userId), field(context.sessionHash), field(context.subject),field(context.action), contextSignature(context));

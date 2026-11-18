@@ -1,0 +1,12 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:3000 {
+		# The app trusts X-Forwarded-For only when this shared secret is present.
+		# header_up replaces any value a client might send.
+		header_up X-Tempocove-Proxy-Secret {$PROXY_SHARED_SECRET}
+	}
+}

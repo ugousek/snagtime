@@ -31,6 +31,8 @@ export type EventTypeSummary = {
   locationValue: string | null; isActive: boolean; bufferBeforeMinutes: number;
   bufferAfterMinutes: number; minimumNoticeMinutes: number; bookingWindowDays: number;
   priceCents: number; currency: string; bookingUrl: string;
+  /** Places per time slot: 1 = one-to-one service, more = group session (class, course). */
+  capacity: number;
   durations: EventDurationOption[]; questions: CustomQuestion[]; branding: WorkspaceBranding | null;
   bookingCount: number; hostName: string;
 };
@@ -44,6 +46,8 @@ export type AvailabilitySchedule = { timeZone: string; intervals: AvailabilityIn
 export type BookingSlot = {
   start: string; end: string; timeZone: string; durationId: string;
   durationMinutes: number; priceCents: number; currency: string;
+  /** Group sessions only: places in total and places still free. */
+  capacity?: number; seatsLeft?: number;
 };
 export type BookingAnswer = { questionId: string | null; questionLabel: string; value: unknown };
 export type BookingSummary = {
@@ -67,7 +71,7 @@ export type WorkspaceBranding = {
   description: string | null; footerText: string | null;
 };
 
-export type CreateEventTypeInput = Omit<EventTypeSummary, "id" | "bookingUrl" | "durations" | "questions" | "branding" | "bookingCount" | "hostName"> & {
+export type CreateEventTypeInput = Omit<EventTypeSummary, "id" | "bookingUrl" | "durations" | "questions" | "branding" | "bookingCount" | "hostName" | "capacity"> & { capacity?: number } & {
   durations?: Array<Omit<EventDurationOption, "id"> & { id?: string }>;
   questions?: Array<Omit<CustomQuestion, "id"> & { id?: string }>;
 };

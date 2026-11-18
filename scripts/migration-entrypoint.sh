@@ -16,4 +16,14 @@ case "$DATABASE_URL" in
   *) echo '{"status":"error","code":"VERIFIED_TLS_REQUIRED"}' >&2; exit 78 ;;
 esac
 
-exec psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 --single-transaction -f /migrations/migration.sql
+# Apply every migration directory in order. The later steps are written idempotently (IF NOT EXISTS,
+# CREATE OR REPLACE, DROP ... IF EXISTS), so re-running them on an upgraded database is safe.
+# The baseline creates tables without IF NOT EXISTS and is therefore skipped once the schema exists.
+schema_exists=$(psql "$DATABASE_URL" -X -tAc "SELECT to_regclass('public.\"User\"') IS NOT NULL")
+for step in $(ls -1 /migrations/steps | sort); do
+  file="/migrations/steps/$step/migration.sql"
+  [ -f "$file" ] || continue
+  case "$step" in *_production_baseline) [ "$schema_exists" = "t" ] && continue ;; esac
+  psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 --single-transaction -f "$file"
+  echo "{\"status\":\"applied\",\"migration\":\"$step\"}"
+done

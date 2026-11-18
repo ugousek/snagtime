@@ -4,9 +4,10 @@ import { bookingInput } from "@/server/validation";
 import { AppError } from "@/server/errors";
 import { clientAddress, enforceRateLimit } from "@/server/rate-limit";
 import { exchangeBookingCapabilities, manageCookieName, manageCookieOptions } from "@/server/auth/capabilities";
+import { withDatabaseScope } from "@/server/db-context";
 
 type Context = { params: Promise<{ slug: string }> };
-export async function POST(request: Request, context: Context) {
+async function POSTHandler(request: Request, context: Context) {
   try {
     const { slug } = await context.params;
     // The untrusted local-demo bucket is intentionally fixed and bounded, but large enough for a room of demo users.
@@ -25,3 +26,5 @@ export async function POST(request: Request, context: Context) {
     return response;
   } catch (error) { return apiError(error); }
 }
+
+export const POST = withDatabaseScope(POSTHandler);
